@@ -31,7 +31,15 @@ fn add_compact_format() {
 }
 
 #[test]
-fn rm_subtracts() {
+fn remove_subtracts() {
+    let dir = tempdir().unwrap();
+    flexi(&["add", "2", "hr"], dir.path()).success();
+    flexi(&["remove", "30", "min"], dir.path()).success();
+    flexi(&[], dir.path()).success().stdout("1 hr 30 min\n");
+}
+
+#[test]
+fn rm_alias_subtracts() {
     let dir = tempdir().unwrap();
     flexi(&["add", "2", "hr"], dir.path()).success();
     flexi(&["rm", "30", "min"], dir.path()).success();
@@ -59,6 +67,20 @@ fn reset_to_zero() {
     flexi(&["add", "1", "hr", "30", "min"], dir.path()).success();
     flexi(&["reset"], dir.path()).success();
     flexi(&[], dir.path()).success().stdout("0 min\n");
+}
+
+#[test]
+fn copy_prints_balance() {
+    let dir = tempdir().unwrap();
+    flexi(&["add", "1", "hr"], dir.path()).success();
+    flexi(&["copy"], dir.path()).success().stdout("1 hr\n");
+}
+
+#[test]
+fn cp_alias_prints_balance() {
+    let dir = tempdir().unwrap();
+    flexi(&["add", "1", "hr"], dir.path()).success();
+    flexi(&["cp"], dir.path()).success().stdout("1 hr\n");
 }
 
 #[test]

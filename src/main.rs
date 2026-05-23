@@ -23,7 +23,8 @@ enum Commands {
         time: Vec<String>,
     },
     /// Remove time from your flexi balance
-    Rm {
+    #[command(alias = "rm")]
+    Remove {
         #[arg(trailing_var_arg = true, required = true)]
         time: Vec<String>,
     },
@@ -35,6 +36,7 @@ enum Commands {
     /// Reset your flexi balance to zero
     Reset,
     /// Copy flexi balance to clipboard
+    #[command(alias = "cp")]
     Copy,
     /// Print shell completion script
     Completions {
@@ -49,6 +51,8 @@ fn copy_to_clipboard(text: &str) -> Result<()> {
         use std::process::{Command, Stdio};
         let mut child = Command::new("wl-copy")
             .stdin(Stdio::piped())
+            .stdout(Stdio::null())
+            .stderr(Stdio::null())
             .spawn()
             .context("wl-copy not found — install wl-clipboard")?;
         if let Some(mut stdin) = child.stdin.take() {
@@ -94,7 +98,7 @@ fn main() -> Result<()> {
             storage::write_minutes(&path, new)?;
             print_balance(new);
         }
-        Some(Commands::Rm { time }) => {
+        Some(Commands::Remove { time }) => {
             let delta = time::parse_duration(&time.join(" "))?;
             let current = storage::read_minutes(&path)?;
             let new = current - delta;
