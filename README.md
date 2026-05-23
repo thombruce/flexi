@@ -4,6 +4,18 @@ A minimal CLI tool for tracking your flexi-time balance.
 
 ## Installation
 
+**Homebrew** (macOS/Linux):
+```sh
+brew tap thombruce/tap
+brew install flexi
+```
+
+**crates.io** (requires Rust):
+```sh
+cargo install flexi
+```
+
+**From source**:
 ```sh
 cargo install --path .
 ```
