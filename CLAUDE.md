@@ -33,3 +33,18 @@ Single binary crate. All state is `i32` minutes internally; `time.rs` owns the b
 ```toml
 path = "/custom/path/to/flexi.txt"
 ```
+
+## Releases
+
+**GitHub Releases** build automatically via `.github/workflows/release.yml` on `git tag vX.Y.Z && git push --tags`.
+
+**crates.io:** `cargo publish` (requires `cargo login` first).
+
+**Homebrew tap:** lives at `https://github.com/thombruce/homebrew-tap` — `Formula/flexi.rb`. On each new version, update `version` and recompute the 4 `sha256` values:
+
+```sh
+curl -sL https://github.com/thombruce/flexi/releases/download/vVERSION/flexi-vVERSION-x86_64-apple-darwin.tar.gz | sha256sum
+curl -sL https://github.com/thombruce/flexi/releases/download/vVERSION/flexi-vVERSION-aarch64-apple-darwin.tar.gz | sha256sum
+curl -sL https://github.com/thombruce/flexi/releases/download/vVERSION/flexi-vVERSION-x86_64-unknown-linux-gnu.tar.gz | sha256sum
+curl -sL https://github.com/thombruce/flexi/releases/download/vVERSION/flexi-vVERSION-aarch64-unknown-linux-gnu.tar.gz | sha256sum
+```
