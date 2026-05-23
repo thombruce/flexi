@@ -28,11 +28,13 @@ flexi add 1 hr 30 min     # add time
 flexi remove 1 hr          # subtract time (alias: rm)
 flexi set 2 hr             # set balance to exact value
 flexi reset                # reset balance to zero
+flexi log                  # show change history
+flexi undo                 # undo last change
 flexi copy                 # copy balance to clipboard (alias: cp)
 flexi completions <shell>  # print shell completion script
 ```
 
-Mutation commands (`add`, `remove`, `set`, `reset`) print the updated balance after making changes.
+`add` and `remove` print the change and new balance (e.g. `+1 hr 30 min → 3 hr`). `set` and `reset` print the new balance.
 
 Quotes are optional — `flexi add 1h30m` and `flexi add "1h30m"` are equivalent.
 
@@ -82,7 +84,7 @@ Create `~/.config/flexi/flexi.toml` to override the storage path:
 path = "/path/to/flexi.txt"
 ```
 
-Without config, the balance is stored at `~/.local/share/flexi/flexi.txt` (or the platform equivalent).
+Without config, the balance is stored at `~/.local/share/flexi/flexi.txt` (or the platform equivalent). The change log is stored alongside it as `flexi.log`.
 
 ## License
 
