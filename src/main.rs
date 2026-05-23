@@ -65,6 +65,18 @@ fn copy_to_clipboard(text: &str) -> Result<()> {
     Ok(())
 }
 
+fn print_change(change: i32, new: i32) {
+    let sign = if change >= 0 { "+" } else { "" };
+    let delta = format!("{}{}", sign, time::format_duration(change));
+    let delta_colored = if change > 0 {
+        delta.if_supports_color(Stdout, |t| t.green()).to_string()
+    } else {
+        delta.if_supports_color(Stdout, |t| t.red()).to_string()
+    };
+    print!("{} → ", delta_colored);
+    print_balance(new);
+}
+
 fn print_balance(mins: i32) {
     let formatted = time::format_duration(mins);
     if mins > 0 {
@@ -96,14 +108,14 @@ fn main() -> Result<()> {
             let current = storage::read_minutes(&path)?;
             let new = current + delta;
             storage::write_minutes(&path, new)?;
-            print_balance(new);
+            print_change(new - current, new);
         }
         Some(Commands::Remove { time }) => {
             let delta = time::parse_duration(&time.join(" "))?;
             let current = storage::read_minutes(&path)?;
             let new = current - delta;
             storage::write_minutes(&path, new)?;
-            print_balance(new);
+            print_change(new - current, new);
         }
         Some(Commands::Set { time }) => {
             let mins = time::parse_duration(&time.join(" "))?;

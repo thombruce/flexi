@@ -84,6 +84,23 @@ fn cp_alias_prints_balance() {
 }
 
 #[test]
+fn add_prints_delta() {
+    let dir = tempdir().unwrap();
+    flexi(&["add", "1", "hr", "30", "min"], dir.path())
+        .success()
+        .stdout("+1 hr 30 min → 1 hr 30 min\n");
+}
+
+#[test]
+fn remove_prints_delta() {
+    let dir = tempdir().unwrap();
+    flexi(&["add", "2", "hr"], dir.path()).success();
+    flexi(&["remove", "30", "min"], dir.path())
+        .success()
+        .stdout("-30 min → 1 hr 30 min\n");
+}
+
+#[test]
 fn negative_roundtrip() {
     let dir = tempdir().unwrap();
     flexi(&["add", "1", "hr", "30", "min"], dir.path()).success();
