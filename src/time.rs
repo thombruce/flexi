@@ -2,6 +2,12 @@ use anyhow::{bail, Result};
 
 pub fn parse_duration(s: &str) -> Result<i32> {
     let s = s.trim().to_lowercase();
+    let (negative, s) = if s.starts_with('-') {
+        (true, s[1..].trim_start().to_string())
+    } else {
+        (false, s)
+    };
+
     let tokens: Vec<&str> = s.split_whitespace().collect();
 
     let mut hours: i32 = 0;
@@ -30,7 +36,8 @@ pub fn parse_duration(s: &str) -> Result<i32> {
         bail!("empty time string");
     }
 
-    Ok(hours * 60 + mins)
+    let total = hours * 60 + mins;
+    Ok(if negative { -total } else { total })
 }
 
 pub fn format_duration(total_mins: i32) -> String {
@@ -103,5 +110,22 @@ mod tests {
     fn format_negative() {
         assert_eq!(format_duration(-90), "-1 hr 30 min");
         assert_eq!(format_duration(-45), "-45 min");
+    }
+
+    #[test]
+    fn parse_negative_hr_and_min() {
+        assert_eq!(parse_duration("-1 hr 30 min").unwrap(), -90);
+    }
+
+    #[test]
+    fn parse_negative_min_only() {
+        assert_eq!(parse_duration("-45 min").unwrap(), -45);
+    }
+
+    #[test]
+    fn roundtrip_negative() {
+        assert_eq!(parse_duration(&format_duration(-90)).unwrap(), -90);
+        assert_eq!(parse_duration(&format_duration(-45)).unwrap(), -45);
+        assert_eq!(parse_duration(&format_duration(-120)).unwrap(), -120);
     }
 }
