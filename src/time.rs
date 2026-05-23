@@ -8,14 +8,52 @@ pub fn parse_duration(s: &str) -> Result<i32> {
         (false, s)
     };
 
-    let tokens: Vec<&str> = s.split_whitespace().collect();
+    if s.is_empty() {
+        bail!("empty time string");
+    }
 
-    let mut hours: i32 = 0;
-    let mut mins: i32 = 0;
+    let s = s.replace(',', ".");
+
+    let total = if !s.contains(' ') {
+        parse_compact(&s)
+            .ok_or_else(|| anyhow::anyhow!("invalid time format {:?}", s))?
+    } else {
+        parse_spaced(&s)?
+    };
+
+    Ok(if negative { -total } else { total })
+}
+
+fn parse_compact(s: &str) -> Option<i32> {
+    if let Ok(n) = s.parse::<f64>() {
+        return Some((n * 60.0).round() as i32);
+    }
+    if let Some(h_pos) = s.find('h') {
+        let hours: f64 = if s[..h_pos].is_empty() { 0.0 } else { s[..h_pos].parse().ok()? };
+        let rest = &s[h_pos + 1..];
+        let mins: f64 = if rest.is_empty() {
+            0.0
+        } else if rest.ends_with('m') {
+            rest[..rest.len() - 1].parse().ok()?
+        } else {
+            return None;
+        };
+        Some((hours * 60.0 + mins).round() as i32)
+    } else if s.ends_with('m') {
+        let mins: f64 = s[..s.len() - 1].parse().ok()?;
+        Some(mins.round() as i32)
+    } else {
+        None
+    }
+}
+
+fn parse_spaced(s: &str) -> Result<i32> {
+    let tokens: Vec<&str> = s.split_whitespace().collect();
+    let mut total_mins: i32 = 0;
     let mut i = 0;
 
     while i < tokens.len() {
-        let n: i32 = tokens[i]
+        let n: f64 = tokens[i]
             .parse()
             .map_err(|_| anyhow::anyhow!("expected number, got {:?}", tokens[i]))?;
         i += 1;
@@ -25,19 +63,14 @@ pub fn parse_duration(s: &str) -> Result<i32> {
         }
 
         match tokens[i] {
-            "hr" | "hrs" | "hour" | "hours" => hours = n,
-            "min" | "mins" | "minute" | "minutes" => mins = n,
+            "hr" | "hrs" | "hour" | "hours" => total_mins += (n * 60.0).round() as i32,
+            "min" | "mins" | "minute" | "minutes" => total_mins += n.round() as i32,
             u => bail!("unknown time unit {:?}", u),
         }
         i += 1;
     }
 
-    if hours == 0 && mins == 0 && !s.is_empty() && tokens.is_empty() {
-        bail!("empty time string");
-    }
-
-    let total = hours * 60 + mins;
-    Ok(if negative { -total } else { total })
+    Ok(total_mins)
 }
 
 pub fn format_duration(total_mins: i32) -> String {
@@ -127,5 +160,40 @@ mod tests {
         assert_eq!(parse_duration(&format_duration(-90)).unwrap(), -90);
         assert_eq!(parse_duration(&format_duration(-45)).unwrap(), -45);
         assert_eq!(parse_duration(&format_duration(-120)).unwrap(), -120);
+    }
+
+    #[test]
+    fn parse_bare_integer_as_hours() {
+        assert_eq!(parse_duration("2").unwrap(), 120);
+        assert_eq!(parse_duration("1").unwrap(), 60);
+    }
+
+    #[test]
+    fn parse_missing_unit_errors() {
+        assert!(parse_duration("1 hr 30").is_err());
+        assert!(parse_duration("").is_err());
+    }
+
+    #[test]
+    fn parse_compact_formats() {
+        assert_eq!(parse_duration("1h30m").unwrap(), 90);
+        assert_eq!(parse_duration("1h").unwrap(), 60);
+        assert_eq!(parse_duration("30m").unwrap(), 30);
+        assert_eq!(parse_duration("1.5h").unwrap(), 90);
+        assert_eq!(parse_duration("-1h30m").unwrap(), -90);
+    }
+
+    #[test]
+    fn parse_decimal_formats() {
+        assert_eq!(parse_duration("1.5").unwrap(), 90);
+        assert_eq!(parse_duration("0.5").unwrap(), 30);
+        assert_eq!(parse_duration("1.5 hours").unwrap(), 90);
+        assert_eq!(parse_duration("1.5 hr").unwrap(), 90);
+    }
+
+    #[test]
+    fn parse_european_decimal() {
+        assert_eq!(parse_duration("1,5").unwrap(), 90);
+        assert_eq!(parse_duration("1,5 hours").unwrap(), 90);
     }
 }
