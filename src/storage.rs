@@ -16,6 +16,9 @@ pub fn write_minutes(path: &Path, mins: i32) -> Result<()> {
         std::fs::create_dir_all(parent)
             .with_context(|| format!("creating directory {:?}", parent))?;
     }
-    std::fs::write(path, format_duration(mins))
-        .with_context(|| format!("writing {:?}", path))
+    let tmp = path.with_extension("tmp");
+    std::fs::write(&tmp, format_duration(mins))
+        .with_context(|| format!("writing {:?}", tmp))?;
+    std::fs::rename(&tmp, path)
+        .with_context(|| format!("renaming {:?} to {:?}", tmp, path))
 }

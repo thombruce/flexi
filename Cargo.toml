@@ -15,6 +15,12 @@ path = "src/main.rs"
 [dependencies]
 anyhow = "1"
 clap = { version = "4", features = ["derive"] }
+clap_complete = "4"
 dirs = "5"
+owo-colors = { version = "4", features = ["supports-colors"] }
 serde = { version = "1", features = ["derive"] }
 toml = "0.8"
+
+[dev-dependencies]
+assert_cmd = "2"
+tempfile = "3"
