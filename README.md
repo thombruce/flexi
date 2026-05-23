@@ -29,7 +29,18 @@ flexi add "45 min"      # quotes optional
 flexi rm 1 hr           # subtract time
 ```
 
-Time strings accept `hr`/`hrs`/`hour`/`hours` and `min`/`mins`/`minute`/`minutes`. Hours must come before minutes. Negative balances are displayed as e.g. `-1 hr 30 min`.
+All of the following time formats are accepted:
+
+| Format | Example |
+|--------|---------|
+| `N hr M min` | `1 hr 30 min`, `45 min`, `2 hr` |
+| `N hour M minutes` | `1 hour 30 minutes`, `2 hours` |
+| Compact | `1h30m`, `1h`, `30m`, `1.5h` |
+| Decimal hours | `1.5`, `0.5` |
+| Decimal hours with unit | `1.5 hours`, `1.5 hr` |
+| European decimal | `1,5`, `1,5 hours` |
+
+Negative balances display as e.g. `-1 hr 30 min`.
 
 ## Configuration
 
