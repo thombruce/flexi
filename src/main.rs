@@ -35,6 +35,10 @@ enum Commands {
     },
     /// Reset your flexi balance to zero
     Reset,
+    /// Show balance change history
+    Log,
+    /// Undo the last change
+    Undo,
     /// Copy flexi balance to clipboard
     #[command(alias = "cp")]
     Copy,
@@ -97,6 +101,7 @@ fn main() -> Result<()> {
     }
 
     let path = config::resolve_flexi_path()?;
+    let log_path = storage::log_path(&path);
 
     match cli.command {
         None => {
@@ -108,23 +113,51 @@ fn main() -> Result<()> {
             let current = storage::read_minutes(&path)?;
             let new = current + delta;
             storage::write_minutes(&path, new)?;
-            print_change(new - current, new);
+            let change = new - current;
+            let sign = if change >= 0 { "+" } else { "" };
+            let desc = format!("{}{} → {}", sign, time::format_duration(change), time::format_duration(new));
+            storage::append_log(&log_path, current, new, &desc)?;
+            print_change(change, new);
         }
         Some(Commands::Remove { time }) => {
             let delta = time::parse_duration(&time.join(" "))?;
             let current = storage::read_minutes(&path)?;
             let new = current - delta;
             storage::write_minutes(&path, new)?;
-            print_change(new - current, new);
+            let change = new - current;
+            let sign = if change >= 0 { "+" } else { "" };
+            let desc = format!("{}{} → {}", sign, time::format_duration(change), time::format_duration(new));
+            storage::append_log(&log_path, current, new, &desc)?;
+            print_change(change, new);
         }
         Some(Commands::Set { time }) => {
             let mins = time::parse_duration(&time.join(" "))?;
+            let prev = storage::read_minutes(&path)?;
             storage::write_minutes(&path, mins)?;
+            let desc = format!("= {}", time::format_duration(mins));
+            storage::append_log(&log_path, prev, mins, &desc)?;
             print_balance(mins);
         }
         Some(Commands::Reset) => {
+            let prev = storage::read_minutes(&path)?;
             storage::write_minutes(&path, 0)?;
+            storage::append_log(&log_path, prev, 0, "reset")?;
             print_balance(0);
+        }
+        Some(Commands::Log) => {
+            for entry in storage::read_log(&log_path)? {
+                let ts = entry.timestamp.get(..16).unwrap_or(&entry.timestamp).replace('T', " ");
+                println!("{}  {}", ts, entry.description);
+            }
+        }
+        Some(Commands::Undo) => {
+            match storage::pop_log(&log_path)? {
+                None => println!("nothing to undo"),
+                Some(entry) => {
+                    storage::write_minutes(&path, entry.prev)?;
+                    print_change(entry.prev - entry.new, entry.prev);
+                }
+            }
         }
         Some(Commands::Copy) => {
             let mins = storage::read_minutes(&path)?;

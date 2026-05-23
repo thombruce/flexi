@@ -101,6 +101,34 @@ fn remove_prints_delta() {
 }
 
 #[test]
+fn log_records_mutations() {
+    let dir = tempdir().unwrap();
+    flexi(&["add", "1", "hr"], dir.path()).success();
+    flexi(&["remove", "30", "min"], dir.path()).success();
+    let out = flexi(&["log"], dir.path()).success().get_output().stdout.clone();
+    let text = String::from_utf8_lossy(&out);
+    let lines: Vec<&str> = text.lines().collect();
+    assert_eq!(lines.len(), 2);
+    assert!(lines[0].contains("+1 hr → 1 hr"));
+    assert!(lines[1].contains("-30 min → 30 min"));
+}
+
+#[test]
+fn undo_reverses_last_change() {
+    let dir = tempdir().unwrap();
+    flexi(&["add", "1", "hr"], dir.path()).success();
+    flexi(&["add", "30", "min"], dir.path()).success();
+    flexi(&["undo"], dir.path()).success().stdout("-30 min → 1 hr\n");
+    flexi(&[], dir.path()).success().stdout("1 hr\n");
+}
+
+#[test]
+fn undo_empty_prints_message() {
+    let dir = tempdir().unwrap();
+    flexi(&["undo"], dir.path()).success().stdout("nothing to undo\n");
+}
+
+#[test]
 fn negative_roundtrip() {
     let dir = tempdir().unwrap();
     flexi(&["add", "1", "hr", "30", "min"], dir.path()).success();
