@@ -8,7 +8,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 cargo build          # compile
 cargo run            # run (display balance)
 cargo run -- add 1 hr 30 min
-cargo run -- rm 30 min
+cargo run -- remove 30 min
 cargo test           # run all tests
 cargo test time      # run tests in a specific module
 cargo clippy         # lint
@@ -18,7 +18,7 @@ cargo clippy         # lint
 
 Single binary crate. All state is `i32` minutes internally; `time.rs` owns the boundary between minutes and human-readable strings.
 
-**Data flow for `add`/`rm`:**
+**Data flow for `add`/`remove`:**
 `main.rs` joins `Vec<String>` args → `time::parse_duration` → arithmetic → `storage::write_minutes` → `time::format_duration` written to disk.
 
 **Modules:**
@@ -40,11 +40,4 @@ path = "/custom/path/to/flexi.txt"
 
 **crates.io:** `cargo publish` (requires `cargo login` first).
 
-**Homebrew tap:** lives at `https://github.com/thombruce/homebrew-tap` — `Formula/flexi.rb`. On each new version, update `version` and recompute the 4 `sha256` values:
-
-```sh
-curl -sL https://github.com/thombruce/flexi/releases/download/vVERSION/flexi-vVERSION-x86_64-apple-darwin.tar.gz | sha256sum
-curl -sL https://github.com/thombruce/flexi/releases/download/vVERSION/flexi-vVERSION-aarch64-apple-darwin.tar.gz | sha256sum
-curl -sL https://github.com/thombruce/flexi/releases/download/vVERSION/flexi-vVERSION-x86_64-unknown-linux-gnu.tar.gz | sha256sum
-curl -sL https://github.com/thombruce/flexi/releases/download/vVERSION/flexi-vVERSION-aarch64-unknown-linux-gnu.tar.gz | sha256sum
-```
+**Homebrew tap:** updated automatically on release via the Git workflow.
