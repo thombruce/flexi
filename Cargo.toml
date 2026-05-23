@@ -2,6 +2,11 @@
 name = "flexi"
 version = "0.1.0"
 edition = "2021"
+description = "A minimal CLI tool for tracking your flexi-time balance"
+license = "MIT"
+repository = "https://github.com/thombruce/flexi"
+keywords = ["flexi", "time", "cli", "productivity"]
+categories = ["command-line-utilities"]
 
 [[bin]]
 name = "flexi"

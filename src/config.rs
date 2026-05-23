@@ -13,15 +13,14 @@ pub fn resolve_flexi_path() -> Result<PathBuf> {
         return Ok(p);
     }
 
-    let data_dir = dirs::data_dir()
-        .or_else(|| dirs::home_dir().map(|h| h.join(".local/share")))
+    let data_dir = xdg_data_dir()
         .context("cannot determine data directory")?;
 
     Ok(data_dir.join("flexi").join("flexi.txt"))
 }
 
 fn load_config() -> Result<Config> {
-    let config_dir = match dirs::config_dir() {
+    let config_dir = match xdg_config_dir() {
         Some(d) => d,
         None => return Ok(Config::default()),
     };
@@ -35,4 +34,16 @@ fn load_config() -> Result<Config> {
         .with_context(|| format!("reading {:?}", config_path))?;
 
     toml::from_str(&raw).with_context(|| format!("parsing {:?}", config_path))
+}
+
+fn xdg_config_dir() -> Option<PathBuf> {
+    std::env::var_os("XDG_CONFIG_HOME")
+        .map(PathBuf::from)
+        .or_else(|| dirs::home_dir().map(|h| h.join(".config")))
+}
+
+fn xdg_data_dir() -> Option<PathBuf> {
+    std::env::var_os("XDG_DATA_HOME")
+        .map(PathBuf::from)
+        .or_else(|| dirs::home_dir().map(|h| h.join(".local/share")))
 }
