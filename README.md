@@ -7,7 +7,7 @@ A minimal CLI tool for tracking your flexi-time balance.
 **Homebrew** (macOS/Linux):
 ```sh
 brew tap thombruce/tap
-brew install flexi
+brew install thombruce/tap/flexi
 ```
 
 **crates.io** (requires Rust):
