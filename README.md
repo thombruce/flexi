@@ -23,11 +23,15 @@ cargo install --path .
 ## Usage
 
 ```sh
-flexi                   # display current balance
-flexi add 1 hr 30 min  # add time
-flexi add "45 min"      # quotes optional
-flexi rm 1 hr           # subtract time
+flexi                      # display current balance
+flexi add 1 hr 30 min     # add time
+flexi rm 1 hr              # subtract time
+flexi set 2 hr             # set balance to exact value
+flexi reset                # reset balance to zero
+flexi completions <shell>  # print shell completion script
 ```
+
+Quotes are optional — `flexi add 1h30m` and `flexi add "1h30m"` are equivalent.
 
 All of the following time formats are accepted:
 
@@ -40,7 +44,15 @@ All of the following time formats are accepted:
 | Decimal hours with unit | `1.5 hours`, `1.5 hr` |
 | European decimal | `1,5`, `1,5 hours` |
 
-Negative balances display as e.g. `-1 hr 30 min`.
+Positive balances display in green, negative in red. Negative balances display as e.g. `-1 hr 30 min`.
+
+### Shell completions
+
+```sh
+flexi completions zsh > ~/.zsh/completions/_flexi
+flexi completions bash > ~/.bash_completion.d/flexi
+flexi completions fish > ~/.config/fish/completions/flexi.fish
+```
 
 ## Configuration
 
