@@ -34,7 +34,7 @@ flexi copy                 # copy balance to clipboard (alias: cp)
 flexi completions <shell>  # print shell completion script
 ```
 
-`add` and `remove` print the change and new balance (e.g. `+1 hr 30 min → 3 hr`). `set` and `reset` print the new balance.
+`add` and `remove` print the change and new balance (e.g. `+1 hr 30 min → 3 hr`). `set` and `reset` print the new balance. `log` prints one entry per line: `2026-05-24 10:20  +1 hr 30 min → 3 hr`.
 
 Quotes are optional — `flexi add 1h30m` and `flexi add "1h30m"` are equivalent.
 
