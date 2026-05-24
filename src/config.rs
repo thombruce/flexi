@@ -2,32 +2,50 @@ use anyhow::{Context, Result};
 use serde::Deserialize;
 use std::path::PathBuf;
 
+#[derive(Deserialize, Clone, Copy, Default)]
+#[serde(rename_all = "lowercase")]
+pub enum TimestampFormat {
+    #[default]
+    Simple,
+    Full,
+}
+
 #[derive(Deserialize, Default)]
-pub struct Config {
+struct RawConfig {
     pub path: Option<PathBuf>,
+    pub timestamp_format: Option<TimestampFormat>,
 }
 
-pub fn resolve_flexi_path() -> Result<PathBuf> {
-    let config = load_config()?;
-    if let Some(p) = config.path {
-        return Ok(p);
-    }
-
-    let data_dir = xdg_data_dir()
-        .context("cannot determine data directory")?;
-
-    Ok(data_dir.join("flexi").join("flexi.txt"))
+pub struct ResolvedConfig {
+    pub path: PathBuf,
+    pub timestamp_format: TimestampFormat,
 }
 
-fn load_config() -> Result<Config> {
+pub fn resolve() -> Result<ResolvedConfig> {
+    let raw = load_config()?;
+
+    let path = if let Some(p) = raw.path {
+        p
+    } else {
+        let data_dir = xdg_data_dir().context("cannot determine data directory")?;
+        data_dir.join("flexi").join("flexi.txt")
+    };
+
+    Ok(ResolvedConfig {
+        path,
+        timestamp_format: raw.timestamp_format.unwrap_or_default(),
+    })
+}
+
+fn load_config() -> Result<RawConfig> {
     let config_dir = match xdg_config_dir() {
         Some(d) => d,
-        None => return Ok(Config::default()),
+        None => return Ok(RawConfig::default()),
     };
 
     let config_path = config_dir.join("flexi").join("flexi.toml");
     if !config_path.exists() {
-        return Ok(Config::default());
+        return Ok(RawConfig::default());
     }
 
     let raw = std::fs::read_to_string(&config_path)

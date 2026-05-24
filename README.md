@@ -78,11 +78,17 @@ flexi completions fish > ~/.config/fish/completions/flexi.fish
 
 ## Configuration
 
-Create `~/.config/flexi/flexi.toml` to override the storage path:
+Create `~/.config/flexi/flexi.toml` to configure flexi:
 
 ```toml
 path = "/path/to/flexi.txt"
+timestamp_format = "simple"  # "simple" (default) or "full"
 ```
+
+| `timestamp_format` | Example |
+|--------------------|---------|
+| `simple` (default) | `2026-05-24 10:20` |
+| `full` | `2026-05-24T10:20:16+01:00` |
 
 Without config, data is stored at `~/.local/share/flexi/flexi.txt` (or the platform equivalent). This file is the change log — the current balance is derived from the last entry.
 

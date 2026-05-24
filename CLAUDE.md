@@ -24,7 +24,7 @@ Single binary crate. All state is `i32` minutes internally; `time.rs` owns the b
 **Modules:**
 - `time.rs` — `parse_duration(s) -> i32`, `format_duration(i32) -> String`. All format rules live here. Negative balance renders as `-X hr Y min`.
 - `config.rs` — reads `~/.config/flexi/flexi.toml` (optional `path` key). Falls back to `~/.local/share/flexi/flexi.txt`.
-- `storage.rs` — `flexi.txt` is the log (single file, no separate `.log`). `append_log`, `read_log`, `pop_log` all operate on this path. `read_minutes` derives current balance from last log entry's `new` field (0 if log empty). Log format: TSV `timestamp\tprev_mins\tnew_mins\tdescription`. Writes are atomic via `.tmp`.
+- `storage.rs` — `flexi.txt` is the log (single file). `append_log`, `read_log`, `pop_log` all operate on this path. `read_minutes` derives current balance by parsing the last entry's description (`new_minutes()`). Log format: TSV `timestamp\tdescription`. Writes are atomic via `.tmp`.
 - `main.rs` — clap CLI only; no business logic.
 
 **Time string format:** `N hr M min`, `N hr`, `M min`, `0 min`. Accepts plural/abbreviated unit words (`hour`, `hours`, `hrs`, `minute`, `minutes`, `mins`). Order must be hours before minutes.
@@ -32,6 +32,7 @@ Single binary crate. All state is `i32` minutes internally; `time.rs` owns the b
 **Config file** (`~/.config/flexi/flexi.toml`):
 ```toml
 path = "/custom/path/to/flexi.txt"
+timestamp_format = "simple"   # "simple" (default): "2026-05-24 10:20"  |  "full": "2026-05-24T10:20:16+01:00"
 ```
 
 ## Releases

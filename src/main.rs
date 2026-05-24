@@ -100,61 +100,61 @@ fn main() -> Result<()> {
         return Ok(());
     }
 
-    let path = config::resolve_flexi_path()?;
+    let cfg = config::resolve()?;
 
     match cli.command {
         None => {
-            let mins = storage::read_minutes(&path)?;
+            let mins = storage::read_minutes(&cfg.path)?;
             print_balance(mins);
         }
         Some(Commands::Add { time }) => {
             let delta = time::parse_duration(&time.join(" "))?;
-            let current = storage::read_minutes(&path)?;
+            let current = storage::read_minutes(&cfg.path)?;
             let new = current + delta;
             let change = new - current;
             let sign = if change >= 0 { "+" } else { "" };
             let desc = format!("{}{} → {}", sign, time::format_duration(change), time::format_duration(new));
-            storage::append_log(&path, current, new, &desc)?;
+            storage::append_log(&cfg.path, &desc, cfg.timestamp_format)?;
             print_change(change, new);
         }
         Some(Commands::Remove { time }) => {
             let delta = time::parse_duration(&time.join(" "))?;
-            let current = storage::read_minutes(&path)?;
+            let current = storage::read_minutes(&cfg.path)?;
             let new = current - delta;
             let change = new - current;
             let sign = if change >= 0 { "+" } else { "" };
             let desc = format!("{}{} → {}", sign, time::format_duration(change), time::format_duration(new));
-            storage::append_log(&path, current, new, &desc)?;
+            storage::append_log(&cfg.path, &desc, cfg.timestamp_format)?;
             print_change(change, new);
         }
         Some(Commands::Set { time }) => {
             let mins = time::parse_duration(&time.join(" "))?;
-            let prev = storage::read_minutes(&path)?;
             let desc = format!("= {}", time::format_duration(mins));
-            storage::append_log(&path, prev, mins, &desc)?;
+            storage::append_log(&cfg.path, &desc, cfg.timestamp_format)?;
             print_balance(mins);
         }
         Some(Commands::Reset) => {
-            let prev = storage::read_minutes(&path)?;
-            storage::append_log(&path, prev, 0, "= 0 min")?;
+            storage::append_log(&cfg.path, "= 0 min", cfg.timestamp_format)?;
             print_balance(0);
         }
         Some(Commands::Log) => {
-            for entry in storage::read_log(&path)? {
+            for entry in storage::read_log(&cfg.path)? {
                 let ts = entry.timestamp.get(..16).unwrap_or(&entry.timestamp).replace('T', " ");
                 println!("{}  {}", ts, entry.description);
             }
         }
         Some(Commands::Undo) => {
-            match storage::pop_log(&path)? {
+            match storage::pop_log(&cfg.path)? {
                 None => println!("nothing to undo"),
                 Some(entry) => {
-                    print_change(entry.prev - entry.new, entry.prev);
+                    let popped_new = entry.new_minutes()?;
+                    let restored = storage::read_minutes(&cfg.path)?;
+                    print_change(restored - popped_new, restored);
                 }
             }
         }
         Some(Commands::Copy) => {
-            let mins = storage::read_minutes(&path)?;
+            let mins = storage::read_minutes(&cfg.path)?;
             let formatted = time::format_duration(mins);
             copy_to_clipboard(&formatted)?;
             print_balance(mins);

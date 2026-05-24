@@ -1,20 +1,36 @@
+use crate::config::TimestampFormat;
+use crate::time::parse_duration;
 use anyhow::{Context, Result};
 use std::path::Path;
 
 pub struct LogEntry {
     pub timestamp: String,
-    pub prev: i32,
-    pub new: i32,
     pub description: String,
 }
 
-pub fn append_log(path: &Path, prev: i32, new: i32, description: &str) -> Result<()> {
+impl LogEntry {
+    pub fn new_minutes(&self) -> Result<i32> {
+        if let Some(pos) = self.description.rfind(" \u{2192} ") {
+            parse_duration(&self.description[pos + 4..])
+        } else if let Some(stripped) = self.description.strip_prefix("= ") {
+            parse_duration(stripped)
+        } else {
+            anyhow::bail!("cannot parse value from log entry: {:?}", self.description)
+        }
+    }
+}
+
+pub fn append_log(path: &Path, description: &str, ts_format: TimestampFormat) -> Result<()> {
     if let Some(parent) = path.parent() {
         std::fs::create_dir_all(parent)
             .with_context(|| format!("creating directory {:?}", parent))?;
     }
-    let timestamp = chrono::Local::now().to_rfc3339_opts(chrono::SecondsFormat::Secs, false);
-    let line = format!("{}\t{}\t{}\t{}\n", timestamp, prev, new, description);
+    let now = chrono::Local::now();
+    let timestamp = match ts_format {
+        TimestampFormat::Simple => now.format("%Y-%m-%d %H:%M").to_string(),
+        TimestampFormat::Full => now.to_rfc3339_opts(chrono::SecondsFormat::Secs, false),
+    };
+    let line = format!("{}\t{}\n", timestamp, description);
     let tmp = path.with_extension("tmp");
     let existing = if path.exists() {
         std::fs::read_to_string(path).with_context(|| format!("reading {:?}", path))?
@@ -61,17 +77,18 @@ pub fn pop_log(path: &Path) -> Result<Option<LogEntry>> {
 }
 
 fn parse_log_line(line: &str) -> Result<LogEntry> {
-    let parts: Vec<&str> = line.splitn(4, '\t').collect();
-    anyhow::ensure!(parts.len() == 4, "malformed log line: {:?}", line);
+    let (ts, desc) = line.split_once('\t')
+        .ok_or_else(|| anyhow::anyhow!("malformed log line: {:?}", line))?;
     Ok(LogEntry {
-        timestamp: parts[0].to_string(),
-        prev: parts[1].parse().with_context(|| format!("parsing prev in {:?}", line))?,
-        new: parts[2].parse().with_context(|| format!("parsing new in {:?}", line))?,
-        description: parts[3].to_string(),
+        timestamp: ts.to_string(),
+        description: desc.to_string(),
     })
 }
 
 pub fn read_minutes(path: &Path) -> Result<i32> {
     let entries = read_log(path)?;
-    Ok(entries.last().map(|e| e.new).unwrap_or(0))
+    match entries.last() {
+        None => Ok(0),
+        Some(e) => e.new_minutes(),
+    }
 }
