@@ -10,15 +10,25 @@ pub enum TimestampFormat {
     Full,
 }
 
+#[derive(Deserialize, Clone, Copy, Default)]
+#[serde(rename_all = "lowercase")]
+pub enum WeekStart {
+    #[default]
+    Monday,
+    Sunday,
+}
+
 #[derive(Deserialize, Default)]
 struct RawConfig {
     pub path: Option<PathBuf>,
     pub timestamp_format: Option<TimestampFormat>,
+    pub week_start: Option<WeekStart>,
 }
 
 pub struct ResolvedConfig {
     pub path: PathBuf,
     pub timestamp_format: TimestampFormat,
+    pub week_start: WeekStart,
 }
 
 pub fn resolve() -> Result<ResolvedConfig> {
@@ -34,6 +44,7 @@ pub fn resolve() -> Result<ResolvedConfig> {
     Ok(ResolvedConfig {
         path,
         timestamp_format: raw.timestamp_format.unwrap_or_default(),
+        week_start: raw.week_start.unwrap_or_default(),
     })
 }
 

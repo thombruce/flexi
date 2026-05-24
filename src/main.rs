@@ -4,6 +4,7 @@ mod time;
 
 use anyhow::{Context, Result};
 use arboard::Clipboard;
+use chrono::Datelike;
 use clap::{CommandFactory, Parser, Subcommand};
 use clap_complete::{generate, Shell};
 use owo_colors::{OwoColorize, Stream::Stdout};
@@ -36,7 +37,26 @@ enum Commands {
     /// Reset your flexi balance to zero
     Reset,
     /// Show balance change history
-    Log,
+    Log {
+        /// Show only the last N entries
+        #[arg(long, short = 'n')]
+        last: Option<usize>,
+        /// Show entries from today only
+        #[arg(long, alias = "day", conflicts_with_all = ["week", "month", "since", "until"])]
+        today: bool,
+        /// Show entries from the current calendar week
+        #[arg(long, conflicts_with_all = ["today", "month", "since", "until"])]
+        week: bool,
+        /// Show entries from the current calendar month
+        #[arg(long, conflicts_with_all = ["today", "week", "since", "until"])]
+        month: bool,
+        /// Show entries on or after this date (YYYY-MM-DD)
+        #[arg(long, conflicts_with_all = ["today", "week", "month"])]
+        since: Option<String>,
+        /// Show entries on or before this date (YYYY-MM-DD)
+        #[arg(long, conflicts_with_all = ["today", "week", "month"])]
+        until: Option<String>,
+    },
     /// Undo the last change
     Undo,
     /// Copy flexi balance to clipboard
@@ -101,6 +121,19 @@ fn print_balance(mins: i32) {
     }
 }
 
+fn print_log_entry(entry: &storage::LogEntry) {
+    let ts = entry.timestamp.get(..16).unwrap_or(&entry.timestamp).replace('T', " ");
+    let description = entry.description.replace(" -> ", " → ");
+    let desc = if description.starts_with('+') {
+        description.if_supports_color(Stdout, |t| t.green()).to_string()
+    } else if description.starts_with('-') {
+        description.if_supports_color(Stdout, |t| t.red()).to_string()
+    } else {
+        description
+    };
+    println!("{}  {}", ts, desc);
+}
+
 fn main() -> Result<()> {
     let cli = Cli::parse();
 
@@ -136,18 +169,57 @@ fn main() -> Result<()> {
             storage::append_log(&cfg.path, "= 0 min", cfg.timestamp_format)?;
             print_balance(0);
         }
-        Some(Commands::Log) => {
-            for entry in storage::read_log(&cfg.path)? {
-                let ts = entry.timestamp.get(..16).unwrap_or(&entry.timestamp).replace('T', " ");
-                let description = entry.description.replace(" -> ", " → ");
-                let desc = if description.starts_with('+') {
-                    description.if_supports_color(Stdout, |t| t.green()).to_string()
-                } else if description.starts_with('-') {
-                    description.if_supports_color(Stdout, |t| t.red()).to_string()
-                } else {
-                    description
+        Some(Commands::Log { last, today, week, month, since, until }) => {
+            let entries = storage::read_log(&cfg.path)?;
+
+            let now = chrono::Local::now().date_naive();
+            let since_date: Option<chrono::NaiveDate>;
+            let until_date: Option<chrono::NaiveDate>;
+
+            if today {
+                since_date = Some(now);
+                until_date = Some(now);
+            } else if week {
+                let days_from_start = match cfg.week_start {
+                    config::WeekStart::Monday => now.weekday().num_days_from_monday(),
+                    config::WeekStart::Sunday => now.weekday().num_days_from_sunday(),
                 };
-                println!("{}  {}", ts, desc);
+                since_date = Some(now - chrono::Duration::days(days_from_start as i64));
+                until_date = Some(now);
+            } else if month {
+                since_date = chrono::NaiveDate::from_ymd_opt(now.year(), now.month(), 1);
+                until_date = Some(now);
+            } else {
+                since_date = since.as_deref()
+                    .map(|s| chrono::NaiveDate::parse_from_str(s, "%Y-%m-%d")
+                        .context("invalid --since date, expected YYYY-MM-DD"))
+                    .transpose()?;
+                until_date = until.as_deref()
+                    .map(|s| chrono::NaiveDate::parse_from_str(s, "%Y-%m-%d")
+                        .context("invalid --until date, expected YYYY-MM-DD"))
+                    .transpose()?;
+            }
+
+            let mut filtered: Vec<_> = entries.into_iter().filter(|e| {
+                let date_str = e.timestamp.get(..10).unwrap_or("");
+                match chrono::NaiveDate::parse_from_str(date_str, "%Y-%m-%d") {
+                    Err(_) => true,
+                    Ok(d) => {
+                        since_date.is_none_or(|s| d >= s)
+                            && until_date.is_none_or(|u| d <= u)
+                    }
+                }
+            }).collect();
+
+            if let Some(n) = last {
+                let len = filtered.len();
+                if n < len {
+                    filtered = filtered.into_iter().skip(len - n).collect();
+                }
+            }
+
+            for entry in &filtered {
+                print_log_entry(entry);
             }
         }
         Some(Commands::Undo) => {

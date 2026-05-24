@@ -33,6 +33,7 @@ Single binary crate. All state is `i32` minutes internally; `time.rs` owns the b
 ```toml
 path = "/custom/path/to/flexi.txt"
 timestamp_format = "simple"   # "simple" (default): "2026-05-24 10:20"  |  "full": "2026-05-24T10:20:16+01:00"
+week_start = "monday"         # "monday" (default) | "sunday"
 ```
 
 ## Releases

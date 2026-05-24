@@ -29,6 +29,11 @@ flexi remove 1 hr          # subtract time (alias: rm)
 flexi set 2 hr             # set balance to exact value
 flexi reset                # reset balance to zero
 flexi log                  # show change history
+flexi log --today          # today only (alias: --day)
+flexi log --week           # current calendar week
+flexi log --month          # current calendar month
+flexi log --since 2026-05-01 --until 2026-05-24  # date range
+flexi log --last 10        # last 10 entries (combinable with filters)
 flexi undo                 # undo last change
 flexi copy                 # copy balance to clipboard (alias: cp)
 flexi completions <shell>  # print shell completion script
@@ -83,12 +88,18 @@ Create `~/.config/flexi/flexi.toml` to configure flexi:
 ```toml
 path = "/path/to/flexi.txt"
 timestamp_format = "simple"  # "simple" (default) or "full"
+week_start = "monday"        # "monday" (default) or "sunday"
 ```
 
 | `timestamp_format` | Example |
 |--------------------|---------|
 | `simple` (default) | `2026-05-24 10:20` |
 | `full` | `2026-05-24T10:20:16+01:00` |
+
+| `week_start` | Description |
+|--------------|-------------|
+| `monday` (default) | Week starts on Monday |
+| `sunday` | Week starts on Sunday |
 
 Without config, data is stored at `~/.local/share/flexi/flexi.txt` (or the platform equivalent). This file is the change log — the current balance is derived from the last entry.
 

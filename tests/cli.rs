@@ -3,6 +3,22 @@ use std::fs;
 use std::path::Path;
 use tempfile::tempdir;
 
+// Helpers for log filter tests
+fn write_log(dir: &Path, content: &str) {
+    fs::create_dir_all(dir.join("flexi")).unwrap();
+    fs::write(dir.join("flexi").join("flexi.txt"), content).unwrap();
+}
+
+fn log_lines(dir: &Path, args: &[&str]) -> Vec<String> {
+    let mut full_args = vec!["log"];
+    full_args.extend_from_slice(args);
+    let out = flexi(&full_args, dir).success().get_output().stdout.clone();
+    String::from_utf8_lossy(&out)
+        .lines()
+        .map(|l| l.to_string())
+        .collect()
+}
+
 fn flexi(args: &[&str], data_dir: &Path) -> assert_cmd::assert::Assert {
     Command::cargo_bin("flexi")
         .unwrap()
@@ -233,4 +249,122 @@ fn full_timestamp_log_display_format() {
     assert!(line.starts_with(&chrono::Local::now().format("%Y-%m-%d").to_string()));
     assert!(!line.contains('T'));
     assert!(line.contains("+1 hr → 1 hr"));
+}
+
+// --- log filter tests ---
+
+#[test]
+fn log_filter_today() {
+    let dir = tempdir().unwrap();
+    write_log(dir.path(), "2020-01-01 09:00 = 1 hr\n");
+    flexi(&["add", "30", "min"], dir.path()).success();
+    let lines = log_lines(dir.path(), &["--today"]);
+    assert_eq!(lines.len(), 1);
+    assert!(lines[0].contains("+30 min"));
+}
+
+#[test]
+fn log_filter_day_alias() {
+    let dir = tempdir().unwrap();
+    write_log(dir.path(), "2020-01-01 09:00 = 1 hr\n");
+    flexi(&["add", "30", "min"], dir.path()).success();
+    let lines = log_lines(dir.path(), &["--day"]);
+    assert_eq!(lines.len(), 1);
+    assert!(lines[0].contains("+30 min"));
+}
+
+#[test]
+fn log_filter_week() {
+    let dir = tempdir().unwrap();
+    write_log(dir.path(), "2020-01-01 09:00 = 1 hr\n");
+    flexi(&["add", "30", "min"], dir.path()).success();
+    let lines = log_lines(dir.path(), &["--week"]);
+    assert_eq!(lines.len(), 1);
+    assert!(lines[0].contains("+30 min"));
+}
+
+#[test]
+fn log_filter_month() {
+    let dir = tempdir().unwrap();
+    write_log(dir.path(), "2020-01-01 09:00 = 1 hr\n");
+    flexi(&["add", "30", "min"], dir.path()).success();
+    let lines = log_lines(dir.path(), &["--month"]);
+    assert_eq!(lines.len(), 1);
+    assert!(lines[0].contains("+30 min"));
+}
+
+#[test]
+fn log_filter_since() {
+    let dir = tempdir().unwrap();
+    write_log(dir.path(), "\
+2026-05-01 09:00 = 1 hr\n\
+2026-05-15 10:00 +30 min → 1 hr 30 min\n\
+2026-06-01 09:00 +1 hr → 2 hr 30 min\n");
+    let lines = log_lines(dir.path(), &["--since", "2026-05-10"]);
+    assert_eq!(lines.len(), 2);
+    assert!(lines[0].contains("2026-05-15"));
+    assert!(lines[1].contains("2026-06-01"));
+}
+
+#[test]
+fn log_filter_until() {
+    let dir = tempdir().unwrap();
+    write_log(dir.path(), "\
+2026-05-01 09:00 = 1 hr\n\
+2026-05-15 10:00 +30 min → 1 hr 30 min\n\
+2026-06-01 09:00 +1 hr → 2 hr 30 min\n");
+    let lines = log_lines(dir.path(), &["--until", "2026-05-20"]);
+    assert_eq!(lines.len(), 2);
+    assert!(lines[0].contains("2026-05-01"));
+    assert!(lines[1].contains("2026-05-15"));
+}
+
+#[test]
+fn log_filter_since_until_range() {
+    let dir = tempdir().unwrap();
+    write_log(dir.path(), "\
+2026-05-01 09:00 = 1 hr\n\
+2026-05-15 10:00 +30 min → 1 hr 30 min\n\
+2026-06-01 09:00 +1 hr → 2 hr 30 min\n");
+    let lines = log_lines(dir.path(), &["--since", "2026-05-10", "--until", "2026-05-20"]);
+    assert_eq!(lines.len(), 1);
+    assert!(lines[0].contains("2026-05-15"));
+}
+
+#[test]
+fn log_filter_last() {
+    let dir = tempdir().unwrap();
+    flexi(&["add", "1", "hr"], dir.path()).success();
+    flexi(&["add", "30", "min"], dir.path()).success();
+    flexi(&["add", "15", "min"], dir.path()).success();
+    let lines = log_lines(dir.path(), &["--last", "2"]);
+    assert_eq!(lines.len(), 2);
+    assert!(lines[0].contains("+30 min"));
+    assert!(lines[1].contains("+15 min"));
+}
+
+#[test]
+fn log_filter_last_with_since() {
+    let dir = tempdir().unwrap();
+    write_log(dir.path(), "\
+2026-05-01 09:00 = 1 hr\n\
+2026-05-10 10:00 +30 min → 1 hr 30 min\n\
+2026-05-20 11:00 +15 min → 1 hr 45 min\n\
+2026-05-25 12:00 +1 hr → 2 hr 45 min\n");
+    let lines = log_lines(dir.path(), &["--since", "2026-05-05", "--last", "2"]);
+    assert_eq!(lines.len(), 2);
+    assert!(lines[0].contains("2026-05-20"));
+    assert!(lines[1].contains("2026-05-25"));
+}
+
+#[test]
+fn log_filter_week_start_sunday() {
+    let dir = tempdir().unwrap();
+    fs::create_dir_all(dir.path().join("flexi")).unwrap();
+    fs::write(dir.path().join("flexi").join("flexi.toml"), "week_start = \"sunday\"\n").unwrap();
+    write_log(dir.path(), "2020-01-01 09:00 = 1 hr\n");
+    flexi(&["add", "30", "min"], dir.path()).success();
+    let lines = log_lines(dir.path(), &["--week"]);
+    assert_eq!(lines.len(), 1);
+    assert!(lines[0].contains("+30 min"));
 }

@@ -8,8 +8,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- `flexi log` filter flags: `--today`/`--day`, `--week`, `--month`, `--since YYYY-MM-DD`, `--until YYYY-MM-DD`, `--last N`
+- `week_start` config key: `"monday"` (default) or `"sunday"`, controls `--week` filter
 - `flexi log` entries colored: positive green, negative red, set/reset neutral
-- `->` accepted as ASCII alias for `→` in hand-edited log entries
+- `->` accepted as ASCII alias for `→` in hand-edited log entries; normalized to `→` in display
 
 ## [0.6.0] - 2026-05-24
 
