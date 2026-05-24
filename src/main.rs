@@ -139,7 +139,14 @@ fn main() -> Result<()> {
         Some(Commands::Log) => {
             for entry in storage::read_log(&cfg.path)? {
                 let ts = entry.timestamp.get(..16).unwrap_or(&entry.timestamp).replace('T', " ");
-                println!("{}  {}", ts, entry.description);
+                let desc = if entry.description.starts_with('+') {
+                    entry.description.if_supports_color(Stdout, |t| t.green()).to_string()
+                } else if entry.description.starts_with('-') {
+                    entry.description.if_supports_color(Stdout, |t| t.red()).to_string()
+                } else {
+                    entry.description.clone()
+                };
+                println!("{}  {}", ts, desc);
             }
         }
         Some(Commands::Undo) => {
