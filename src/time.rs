@@ -2,8 +2,8 @@ use anyhow::{bail, Result};
 
 pub fn parse_duration(s: &str) -> Result<i32> {
     let s = s.trim().to_lowercase();
-    let (negative, s) = if s.starts_with('-') {
-        (true, s[1..].trim_start().to_string())
+    let (negative, s) = if let Some(stripped) = s.strip_prefix('-') {
+        (true, stripped.trim_start().to_string())
     } else {
         (false, s)
     };
@@ -33,14 +33,14 @@ fn parse_compact(s: &str) -> Option<i32> {
         let rest = &s[h_pos + 1..];
         let mins: f64 = if rest.is_empty() {
             0.0
-        } else if rest.ends_with('m') {
-            rest[..rest.len() - 1].parse().ok()?
+        } else if let Some(stripped) = rest.strip_suffix('m') {
+            stripped.parse().ok()?
         } else {
             return None;
         };
         Some((hours * 60.0 + mins).round() as i32)
-    } else if s.ends_with('m') {
-        let mins: f64 = s[..s.len() - 1].parse().ok()?;
+    } else if let Some(stripped) = s.strip_suffix('m') {
+        let mins: f64 = stripped.parse().ok()?;
         Some(mins.round() as i32)
     } else {
         None

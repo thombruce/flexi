@@ -11,7 +11,7 @@ cargo run -- add 1 hr 30 min
 cargo run -- remove 30 min
 cargo test           # run all tests
 cargo test time      # run tests in a specific module
-cargo clippy         # lint
+cargo clippy         # lint (CI runs with -D warnings — fix all warnings before committing)
 ```
 
 ## Architecture
