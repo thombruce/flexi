@@ -358,6 +358,38 @@ fn log_filter_last_with_since() {
 }
 
 #[test]
+fn log_summary() {
+    let dir = tempdir().unwrap();
+    write_log(dir.path(), "\
+2026-05-01 09:00 +2 hr → 2 hr\n\
+2026-05-02 09:00 +1 hr → 3 hr\n\
+2026-05-03 09:00 -30 min → 2 hr 30 min\n");
+    let out = flexi(&["log", "--summary"], dir.path()).success().get_output().stdout.clone();
+    let text = String::from_utf8_lossy(&out);
+    let lines: Vec<&str> = text.lines().collect();
+    assert_eq!(lines.len(), 3);
+    assert!(lines[0].contains("3 hr"));      // Added: 2 hr + 1 hr
+    assert!(lines[1].contains("30 min"));    // Removed: -30 min
+    assert!(lines[2].contains("+2 hr 30 min")); // Net: +2 hr 30 min
+}
+
+#[test]
+fn log_summary_with_filter() {
+    let dir = tempdir().unwrap();
+    write_log(dir.path(), "\
+2026-05-01 09:00 +2 hr → 2 hr\n\
+2026-05-10 09:00 +1 hr → 3 hr\n\
+2026-05-10 10:00 -30 min → 2 hr 30 min\n");
+    let out = flexi(&["log", "--since", "2026-05-09", "--summary"], dir.path())
+        .success().get_output().stdout.clone();
+    let text = String::from_utf8_lossy(&out);
+    let lines: Vec<&str> = text.lines().collect();
+    assert!(lines[0].contains("1 hr"));     // Added: only the May 10 add
+    assert!(lines[1].contains("30 min"));   // Removed: -30 min
+    assert!(lines[2].contains("+30 min"));  // Net: +30 min
+}
+
+#[test]
 fn log_filter_week_start_sunday() {
     let dir = tempdir().unwrap();
     fs::create_dir_all(dir.path().join("flexi")).unwrap();

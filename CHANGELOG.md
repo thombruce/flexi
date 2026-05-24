@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 - `--version` flag
+- `flexi log --summary` — shows totals (added, removed, net) for the filtered period
 
 ## [0.7.0] - 2026-05-24
 

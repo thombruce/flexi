@@ -56,6 +56,9 @@ enum Commands {
         /// Show entries on or before this date (YYYY-MM-DD)
         #[arg(long, conflicts_with_all = ["today", "week", "month"])]
         until: Option<String>,
+        /// Show totals instead of individual entries
+        #[arg(long)]
+        summary: bool,
     },
     /// Undo the last change
     Undo,
@@ -169,7 +172,7 @@ fn main() -> Result<()> {
             storage::append_log(&cfg.path, "= 0 min", cfg.timestamp_format)?;
             print_balance(0);
         }
-        Some(Commands::Log { last, today, week, month, since, until }) => {
+        Some(Commands::Log { last, today, week, month, since, until, summary }) => {
             let entries = storage::read_log(&cfg.path)?;
 
             let now = chrono::Local::now().date_naive();
@@ -218,8 +221,33 @@ fn main() -> Result<()> {
                 }
             }
 
-            for entry in &filtered {
-                print_log_entry(entry);
+            if summary {
+                let added: i32 = filtered.iter()
+                    .filter_map(|e| e.delta_minutes())
+                    .filter(|&d| d > 0)
+                    .sum();
+                let removed: i32 = filtered.iter()
+                    .filter_map(|e| e.delta_minutes())
+                    .filter(|&d| d < 0)
+                    .sum();
+                let net = added + removed;
+                let added_str = time::format_duration(added);
+                let removed_str = time::format_duration(removed);
+                let net_sign = if net >= 0 { "+" } else { "" };
+                let net_str = format!("{}{}", net_sign, time::format_duration(net));
+                println!("Added:   {}", added_str.if_supports_color(Stdout, |t| t.green()));
+                println!("Removed: {}", removed_str.if_supports_color(Stdout, |t| t.red()));
+                if net > 0 {
+                    println!("Net:     {}", net_str.if_supports_color(Stdout, |t| t.green()));
+                } else if net < 0 {
+                    println!("Net:     {}", net_str.if_supports_color(Stdout, |t| t.red()));
+                } else {
+                    println!("Net:     {}", net_str);
+                }
+            } else {
+                for entry in &filtered {
+                    print_log_entry(entry);
+                }
             }
         }
         Some(Commands::Undo) => {

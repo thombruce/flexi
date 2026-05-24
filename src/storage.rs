@@ -9,6 +9,12 @@ pub struct LogEntry {
 }
 
 impl LogEntry {
+    pub fn delta_minutes(&self) -> Option<i32> {
+        let desc = self.description.replace(" -> ", " \u{2192} ");
+        let pos = desc.find(" \u{2192} ")?;
+        parse_duration(&desc[..pos]).ok()
+    }
+
     pub fn new_minutes(&self) -> Result<i32> {
         if let Some(pos) = self.description.rfind(" \u{2192} ") {
             parse_duration(&self.description[pos + 4..])
@@ -101,6 +107,26 @@ mod tests {
 
     fn entry(desc: &str) -> LogEntry {
         LogEntry { timestamp: "2026-05-24 10:20".to_string(), description: desc.to_string() }
+    }
+
+    #[test]
+    fn delta_minutes_positive() {
+        assert_eq!(entry("+45 min → 4 hr 45 min").delta_minutes(), Some(45));
+    }
+
+    #[test]
+    fn delta_minutes_negative() {
+        assert_eq!(entry("-30 min → 4 hr").delta_minutes(), Some(-30));
+    }
+
+    #[test]
+    fn delta_minutes_set_returns_none() {
+        assert_eq!(entry("= 4 hr").delta_minutes(), None);
+    }
+
+    #[test]
+    fn delta_minutes_ascii_arrow() {
+        assert_eq!(entry("+1 hr -> 1 hr").delta_minutes(), Some(60));
     }
 
     #[test]
