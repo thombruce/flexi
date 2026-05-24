@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.7.0] - 2026-05-24
+
 ### Added
 - `flexi log` filter flags: `--today`/`--day`, `--week`, `--month`, `--since YYYY-MM-DD`, `--until YYYY-MM-DD`, `--last N`
 - `week_start` config key: `"monday"` (default) or `"sunday"`, controls `--week` filter
