@@ -7,9 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.8.0] - 2026-05-24
+
 ### Added
 - `--version` flag
-- `flexi log --summary` — shows totals (added, removed, net) for the filtered period
+- `flexi log --summary` — shows totals (added, removed, net) for the filtered period; also shows current balance when no `--until` filter is set
 
 ## [0.7.0] - 2026-05-24
 
