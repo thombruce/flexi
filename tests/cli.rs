@@ -6,6 +6,7 @@ fn flexi(args: &[&str], data_dir: &Path) -> assert_cmd::assert::Assert {
     Command::cargo_bin("flexi")
         .unwrap()
         .env("XDG_DATA_HOME", data_dir)
+        .env("XDG_CONFIG_HOME", data_dir)
         .args(args)
         .assert()
 }

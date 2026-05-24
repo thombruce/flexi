@@ -84,7 +84,7 @@ Create `~/.config/flexi/flexi.toml` to override the storage path:
 path = "/path/to/flexi.txt"
 ```
 
-Without config, the balance is stored at `~/.local/share/flexi/flexi.txt` (or the platform equivalent). The change log is stored alongside it as `flexi.log`.
+Without config, data is stored at `~/.local/share/flexi/flexi.txt` (or the platform equivalent). This file is the change log — the current balance is derived from the last entry.
 
 ## License
 
