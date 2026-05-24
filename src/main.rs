@@ -10,7 +10,7 @@ use clap_complete::{generate, Shell};
 use owo_colors::{OwoColorize, Stream::Stdout};
 
 #[derive(Parser)]
-#[command(name = "flexi", about = "Track your flexi-time balance")]
+#[command(name = "flexi", version, about = "Track your flexi-time balance")]
 struct Cli {
     #[command(subcommand)]
     command: Option<Commands>,
