@@ -30,7 +30,7 @@ pub fn append_log(path: &Path, description: &str, ts_format: TimestampFormat) ->
         TimestampFormat::Simple => now.format("%Y-%m-%d %H:%M").to_string(),
         TimestampFormat::Full => now.to_rfc3339_opts(chrono::SecondsFormat::Secs, false),
     };
-    let line = format!("{}\t{}\n", timestamp, description);
+    let line = format!("{} {}\n", timestamp, description);
     let tmp = path.with_extension("tmp");
     let existing = if path.exists() {
         std::fs::read_to_string(path).with_context(|| format!("reading {:?}", path))?
@@ -77,12 +77,12 @@ pub fn pop_log(path: &Path) -> Result<Option<LogEntry>> {
 }
 
 fn parse_log_line(line: &str) -> Result<LogEntry> {
-    let (ts, desc) = line.split_once('\t')
-        .ok_or_else(|| anyhow::anyhow!("malformed log line: {:?}", line))?;
-    Ok(LogEntry {
-        timestamp: ts.to_string(),
-        description: desc.to_string(),
-    })
+    let ts_len = if line.len() > 10 && line.as_bytes()[10] == b'T' { 25 } else { 16 };
+    anyhow::ensure!(line.len() > ts_len, "malformed log line: {:?}", line);
+    let (ts, rest) = line.split_at(ts_len);
+    let desc = rest.trim_start();
+    anyhow::ensure!(!desc.is_empty(), "malformed log line: {:?}", line);
+    Ok(LogEntry { timestamp: ts.to_string(), description: desc.to_string() })
 }
 
 pub fn read_minutes(path: &Path) -> Result<i32> {
