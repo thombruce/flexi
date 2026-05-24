@@ -12,6 +12,8 @@ impl LogEntry {
     pub fn new_minutes(&self) -> Result<i32> {
         if let Some(pos) = self.description.rfind(" \u{2192} ") {
             parse_duration(&self.description[pos + 4..])
+        } else if let Some(pos) = self.description.rfind(" -> ") {
+            parse_duration(&self.description[pos + 4..])
         } else if let Some(stripped) = self.description.strip_prefix("= ") {
             parse_duration(stripped)
         } else {
@@ -119,6 +121,11 @@ mod tests {
     #[test]
     fn new_minutes_set_zero() {
         assert_eq!(entry("= 0 min").new_minutes().unwrap(), 0);
+    }
+
+    #[test]
+    fn new_minutes_ascii_arrow() {
+        assert_eq!(entry("+45 min -> 4 hr 45 min").new_minutes().unwrap(), 285);
     }
 
     #[test]
