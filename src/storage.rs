@@ -92,3 +92,76 @@ pub fn read_minutes(path: &Path) -> Result<i32> {
         Some(e) => e.new_minutes(),
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn entry(desc: &str) -> LogEntry {
+        LogEntry { timestamp: "2026-05-24 10:20".to_string(), description: desc.to_string() }
+    }
+
+    #[test]
+    fn new_minutes_arrow_positive() {
+        assert_eq!(entry("+45 min → 4 hr 45 min").new_minutes().unwrap(), 285);
+    }
+
+    #[test]
+    fn new_minutes_arrow_negative() {
+        assert_eq!(entry("-30 min → -30 min").new_minutes().unwrap(), -30);
+    }
+
+    #[test]
+    fn new_minutes_set() {
+        assert_eq!(entry("= 4 hr").new_minutes().unwrap(), 240);
+    }
+
+    #[test]
+    fn new_minutes_set_zero() {
+        assert_eq!(entry("= 0 min").new_minutes().unwrap(), 0);
+    }
+
+    #[test]
+    fn new_minutes_bad_description() {
+        assert!(entry("bogus description").new_minutes().is_err());
+    }
+
+    #[test]
+    fn parse_log_line_space_separator() {
+        let e = parse_log_line("2026-05-24 10:20 +1 hr → 1 hr").unwrap();
+        assert_eq!(e.timestamp, "2026-05-24 10:20");
+        assert_eq!(e.description, "+1 hr → 1 hr");
+    }
+
+    #[test]
+    fn parse_log_line_tab_separator() {
+        let e = parse_log_line("2026-05-24 10:20\t+1 hr → 1 hr").unwrap();
+        assert_eq!(e.timestamp, "2026-05-24 10:20");
+        assert_eq!(e.description, "+1 hr → 1 hr");
+    }
+
+    #[test]
+    fn parse_log_line_multiple_spaces() {
+        let e = parse_log_line("2026-05-24 10:20   +1 hr → 1 hr").unwrap();
+        assert_eq!(e.timestamp, "2026-05-24 10:20");
+        assert_eq!(e.description, "+1 hr → 1 hr");
+    }
+
+    #[test]
+    fn parse_log_line_full_timestamp() {
+        let e = parse_log_line("2026-05-24T10:20:16+01:00 +1 hr → 1 hr").unwrap();
+        assert_eq!(e.timestamp, "2026-05-24T10:20:16+01:00");
+        assert_eq!(e.description, "+1 hr → 1 hr");
+    }
+
+    #[test]
+    fn parse_log_line_too_short() {
+        assert!(parse_log_line("2026-05-24").is_err());
+    }
+
+    #[test]
+    fn parse_log_line_empty_description() {
+        assert!(parse_log_line("2026-05-24 10:20").is_err());
+        assert!(parse_log_line("2026-05-24 10:20   ").is_err());
+    }
+}
