@@ -24,7 +24,7 @@ If you have an existing `flexi.log`, rename it to `flexi.txt` (replacing the old
 awk -F'\t' '{print $1 " " $4}' flexi.txt > flexi.tmp && mv flexi.tmp flexi.txt
 ```
 
-## [0.5.0] - 2025
+## [0.5.0] - 2026-05-23
 
 ### Added
 - `flexi log` — show full change history
@@ -32,7 +32,7 @@ awk -F'\t' '{print $1 " " $4}' flexi.txt > flexi.tmp && mv flexi.tmp flexi.txt
 - Delta output on `add` and `remove` (e.g. `+1 hr 30 min → 3 hr`)
 - CI workflow for tests and clippy on push
 
-## [0.4.0] - 2025
+## [0.4.0] - 2026-05-23
 
 ### Added
 - `flexi copy` (alias: `cp`) — copy balance to clipboard; Wayland support via `wl-clipboard`
@@ -41,7 +41,7 @@ awk -F'\t' '{print $1 " " $4}' flexi.txt > flexi.tmp && mv flexi.tmp flexi.txt
 ### Changed
 - `rm` subcommand renamed to `remove`; `rm` kept as alias
 
-## [0.3.0] - 2025
+## [0.3.0] - 2026-05-23
 
 ### Added
 - `flexi set` — set balance to an exact value
@@ -50,12 +50,12 @@ awk -F'\t' '{print $1 " " $4}' flexi.txt > flexi.tmp && mv flexi.tmp flexi.txt
 - Color output: positive balances green, negative red
 - Atomic writes via `.tmp` file
 
-## [0.2.0] - 2025
+## [0.2.0] - 2026-05-23
 
 ### Added
 - Additional time input formats: plural/abbreviated units (`hours`, `hrs`, `mins`), compact (`1h30m`, `1h`, `30m`), decimal (`1.5`, `1.5h`), European decimal (`1,5`)
 
-## [0.1.0] - 2025
+## [0.1.0] - 2026-05-23
 
 ### Added
 - Initial CLI: `flexi` (display balance), `flexi add`, `flexi rm`
