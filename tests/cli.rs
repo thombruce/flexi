@@ -367,10 +367,12 @@ fn log_summary() {
     let out = flexi(&["log", "--summary"], dir.path()).success().get_output().stdout.clone();
     let text = String::from_utf8_lossy(&out);
     let lines: Vec<&str> = text.lines().collect();
-    assert_eq!(lines.len(), 3);
-    assert!(lines[0].contains("3 hr"));      // Added: 2 hr + 1 hr
-    assert!(lines[1].contains("30 min"));    // Removed: -30 min
-    assert!(lines[2].contains("+2 hr 30 min")); // Net: +2 hr 30 min
+    assert_eq!(lines.len(), 5);
+    assert!(lines[0].contains("3 hr"));          // Added: 2 hr + 1 hr
+    assert!(lines[1].contains("30 min"));         // Removed: -30 min
+    assert!(lines[2].contains("+2 hr 30 min"));   // Net
+    assert_eq!(lines[3], "---------");            // separator
+    assert!(lines[4].contains("2 hr 30 min"));    // Balance
 }
 
 #[test]
@@ -387,6 +389,20 @@ fn log_summary_with_filter() {
     assert!(lines[0].contains("1 hr"));     // Added: only the May 10 add
     assert!(lines[1].contains("30 min"));   // Removed: -30 min
     assert!(lines[2].contains("+30 min"));  // Net: +30 min
+}
+
+#[test]
+fn log_summary_with_until_omits_balance() {
+    let dir = tempdir().unwrap();
+    write_log(dir.path(), "\
+2026-05-01 09:00 +1 hr → 1 hr\n\
+2026-05-10 09:00 +30 min → 1 hr 30 min\n");
+    let out = flexi(&["log", "--until", "2026-05-05", "--summary"], dir.path())
+        .success().get_output().stdout.clone();
+    let text = String::from_utf8_lossy(&out);
+    let lines: Vec<&str> = text.lines().collect();
+    assert_eq!(lines.len(), 3); // no Balance line
+    assert!(!text.contains("Balance"));
 }
 
 #[test]
