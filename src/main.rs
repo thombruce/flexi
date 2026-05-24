@@ -81,6 +81,15 @@ fn print_change(change: i32, new: i32) {
     print_balance(new);
 }
 
+fn record_change(cfg: &config::ResolvedConfig, current: i32, new: i32) -> anyhow::Result<()> {
+    let change = new - current;
+    let sign = if change >= 0 { "+" } else { "" };
+    let desc = format!("{}{} → {}", sign, time::format_duration(change), time::format_duration(new));
+    storage::append_log(&cfg.path, &desc, cfg.timestamp_format)?;
+    print_change(change, new);
+    Ok(())
+}
+
 fn print_balance(mins: i32) {
     let formatted = time::format_duration(mins);
     if mins > 0 {
@@ -110,22 +119,12 @@ fn main() -> Result<()> {
         Some(Commands::Add { time }) => {
             let delta = time::parse_duration(&time.join(" "))?;
             let current = storage::read_minutes(&cfg.path)?;
-            let new = current + delta;
-            let change = new - current;
-            let sign = if change >= 0 { "+" } else { "" };
-            let desc = format!("{}{} → {}", sign, time::format_duration(change), time::format_duration(new));
-            storage::append_log(&cfg.path, &desc, cfg.timestamp_format)?;
-            print_change(change, new);
+            record_change(&cfg, current, current + delta)?;
         }
         Some(Commands::Remove { time }) => {
             let delta = time::parse_duration(&time.join(" "))?;
             let current = storage::read_minutes(&cfg.path)?;
-            let new = current - delta;
-            let change = new - current;
-            let sign = if change >= 0 { "+" } else { "" };
-            let desc = format!("{}{} → {}", sign, time::format_duration(change), time::format_duration(new));
-            storage::append_log(&cfg.path, &desc, cfg.timestamp_format)?;
-            print_change(change, new);
+            record_change(&cfg, current, current - delta)?;
         }
         Some(Commands::Set { time }) => {
             let mins = time::parse_duration(&time.join(" "))?;
