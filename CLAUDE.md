@@ -37,6 +37,8 @@ timestamp_format = "simple"   # "simple" (default): "2026-05-24 10:20"  |  "full
 
 ## Releases
 
+Before tagging, update `CHANGELOG.md` and bump the version in `Cargo.toml`, then build to update `Cargo.lock`. Commit both together.
+
 **GitHub Releases** build automatically via `.github/workflows/release.yml` on `git tag vX.Y.Z && git push --tags`.
 
 **crates.io:** `cargo publish` (requires `cargo login` first).
