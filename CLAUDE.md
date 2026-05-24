@@ -37,7 +37,9 @@ timestamp_format = "simple"   # "simple" (default): "2026-05-24 10:20"  |  "full
 
 ## Releases
 
-Before tagging, update `CHANGELOG.md` and bump the version in `Cargo.toml`, then build to update `Cargo.lock`. Commit both together.
+Add notable changes to the `[Unreleased]` section of `CHANGELOG.md` as they are made.
+
+Before tagging, move `CHANGELOG.md`'s `[Unreleased]` section to a new version heading with today's date, bump the version in `Cargo.toml`, then build to update `Cargo.lock`. Commit all together.
 
 **GitHub Releases** build automatically via `.github/workflows/release.yml` on `git tag vX.Y.Z && git push --tags`.
 
