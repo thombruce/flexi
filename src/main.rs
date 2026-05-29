@@ -246,12 +246,6 @@ fn main() -> Result<()> {
                 } else {
                     println!("Net:     {}", net_str);
                 }
-                if until.is_none() {
-                    let balance = storage::read_minutes(&cfg.path)?;
-                    println!("---------");
-                    print!("Balance: ");
-                    print_balance(balance);
-                }
             } else {
                 for entry in &filtered {
                     print_log_entry(entry);

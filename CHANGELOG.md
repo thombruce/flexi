@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 - Log file now uses `>` as the separator between delta and new balance (e.g. `+1 hr > 2 hr`); `→` and `->` remain accepted for backwards compatibility and are displayed as `→` in the CLI
+- `flexi log --summary` no longer shows current balance; totals reflect only the filtered period
 
 ## [0.8.0] - 2026-05-24
 
