@@ -7,6 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+- Log file now uses `>` as the separator between delta and new balance (e.g. `+1 hr > 2 hr`); `→` and `->` remain accepted for backwards compatibility and are displayed as `→` in the CLI
+
 ## [0.8.0] - 2026-05-24
 
 ### Added

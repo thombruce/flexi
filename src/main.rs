@@ -107,7 +107,7 @@ fn print_change(change: i32, new: i32) {
 fn record_change(cfg: &config::ResolvedConfig, current: i32, new: i32) -> anyhow::Result<()> {
     let change = new - current;
     let sign = if change >= 0 { "+" } else { "" };
-    let desc = format!("{}{} → {}", sign, time::format_duration(change), time::format_duration(new));
+    let desc = format!("{}{} > {}", sign, time::format_duration(change), time::format_duration(new));
     storage::append_log(&cfg.path, &desc, cfg.timestamp_format)?;
     print_change(change, new);
     Ok(())
@@ -126,7 +126,9 @@ fn print_balance(mins: i32) {
 
 fn print_log_entry(entry: &storage::LogEntry) {
     let ts = entry.timestamp.get(..16).unwrap_or(&entry.timestamp).replace('T', " ");
-    let description = entry.description.replace(" -> ", " → ");
+    let description = entry.description
+        .replace(" > ", " → ")
+        .replace(" -> ", " → ");
     let desc = if description.starts_with('+') {
         description.if_supports_color(Stdout, |t| t.green()).to_string()
     } else if description.starts_with('-') {

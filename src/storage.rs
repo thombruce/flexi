@@ -10,13 +10,17 @@ pub struct LogEntry {
 
 impl LogEntry {
     pub fn delta_minutes(&self) -> Option<i32> {
-        let desc = self.description.replace(" -> ", " \u{2192} ");
-        let pos = desc.find(" \u{2192} ")?;
+        let desc = self.description
+            .replace(" -> ", " > ")
+            .replace(" \u{2192} ", " > ");
+        let pos = desc.find(" > ")?;
         parse_duration(&desc[..pos]).ok()
     }
 
     pub fn new_minutes(&self) -> Result<i32> {
-        if let Some(pos) = self.description.rfind(" \u{2192} ") {
+        if let Some(pos) = self.description.rfind(" > ") {
+            parse_duration(&self.description[pos + 3..])
+        } else if let Some(pos) = self.description.rfind(" \u{2192} ") {
             parse_duration(&self.description[pos + 4..])
         } else if let Some(pos) = self.description.rfind(" -> ") {
             parse_duration(&self.description[pos + 4..])
@@ -111,12 +115,12 @@ mod tests {
 
     #[test]
     fn delta_minutes_positive() {
-        assert_eq!(entry("+45 min → 4 hr 45 min").delta_minutes(), Some(45));
+        assert_eq!(entry("+45 min > 4 hr 45 min").delta_minutes(), Some(45));
     }
 
     #[test]
     fn delta_minutes_negative() {
-        assert_eq!(entry("-30 min → 4 hr").delta_minutes(), Some(-30));
+        assert_eq!(entry("-30 min > 4 hr").delta_minutes(), Some(-30));
     }
 
     #[test]
@@ -125,18 +129,23 @@ mod tests {
     }
 
     #[test]
-    fn delta_minutes_ascii_arrow() {
+    fn delta_minutes_unicode_arrow_compat() {
+        assert_eq!(entry("+45 min → 4 hr 45 min").delta_minutes(), Some(45));
+    }
+
+    #[test]
+    fn delta_minutes_ascii_arrow_compat() {
         assert_eq!(entry("+1 hr -> 1 hr").delta_minutes(), Some(60));
     }
 
     #[test]
-    fn new_minutes_arrow_positive() {
-        assert_eq!(entry("+45 min → 4 hr 45 min").new_minutes().unwrap(), 285);
+    fn new_minutes_gt_positive() {
+        assert_eq!(entry("+45 min > 4 hr 45 min").new_minutes().unwrap(), 285);
     }
 
     #[test]
-    fn new_minutes_arrow_negative() {
-        assert_eq!(entry("-30 min → -30 min").new_minutes().unwrap(), -30);
+    fn new_minutes_gt_negative() {
+        assert_eq!(entry("-30 min > -30 min").new_minutes().unwrap(), -30);
     }
 
     #[test]
@@ -150,7 +159,12 @@ mod tests {
     }
 
     #[test]
-    fn new_minutes_ascii_arrow() {
+    fn new_minutes_unicode_arrow_compat() {
+        assert_eq!(entry("+45 min → 4 hr 45 min").new_minutes().unwrap(), 285);
+    }
+
+    #[test]
+    fn new_minutes_ascii_arrow_compat() {
         assert_eq!(entry("+45 min -> 4 hr 45 min").new_minutes().unwrap(), 285);
     }
 
