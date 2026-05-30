@@ -20,7 +20,7 @@ struct Cli {
 enum Commands {
     /// Add time to your flexi balance
     Add {
-        #[arg(trailing_var_arg = true, required = true)]
+        #[arg(required = true)]
         time: Vec<String>,
         /// Attach a note to this log entry
         #[arg(long, short = 'm')]
@@ -29,7 +29,7 @@ enum Commands {
     /// Remove time from your flexi balance
     #[command(alias = "rm")]
     Remove {
-        #[arg(trailing_var_arg = true, required = true)]
+        #[arg(required = true)]
         time: Vec<String>,
         /// Attach a note to this log entry
         #[arg(long, short = 'm')]
@@ -37,7 +37,7 @@ enum Commands {
     },
     /// Set your flexi balance to an exact value
     Set {
-        #[arg(trailing_var_arg = true, required = true)]
+        #[arg(required = true)]
         time: Vec<String>,
         /// Attach a note to this log entry
         #[arg(long, short = 'm')]
