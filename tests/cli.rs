@@ -169,6 +169,16 @@ fn reset_logs_set_zero() {
 }
 
 #[test]
+fn reset_with_note() {
+    let dir = tempdir().unwrap();
+    flexi(&["reset", "--note", "end of month"], dir.path()).success();
+    let log = fs::read_to_string(dir.path().join("flexi").join("flexi.txt")).unwrap();
+    assert!(log.contains("= 0 min"));
+    assert!(log.contains("# end of month"));
+    flexi(&[], dir.path()).success().stdout("0 min\n");
+}
+
+#[test]
 fn full_timestamp_format_round_trips() {
     let dir = tempdir().unwrap();
     fs::create_dir_all(dir.path().join("flexi")).unwrap();

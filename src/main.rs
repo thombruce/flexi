@@ -44,7 +44,11 @@ enum Commands {
         note: Option<String>,
     },
     /// Reset your flexi balance to zero
-    Reset,
+    Reset {
+        /// Attach a note to this log entry
+        #[arg(long, short = 'm')]
+        note: Option<String>,
+    },
     /// Show balance change history
     Log {
         /// Show only the last N entries
@@ -197,8 +201,12 @@ fn main() -> Result<()> {
             storage::append_log(&cfg.path, &desc, cfg.timestamp_format)?;
             print_balance(mins);
         }
-        Some(Commands::Reset) => {
-            storage::append_log(&cfg.path, "= 0 min", cfg.timestamp_format)?;
+        Some(Commands::Reset { note }) => {
+            let mut desc = "= 0 min".to_string();
+            if let Some(n) = note {
+                desc.push_str(&format!(" # {}", n));
+            }
+            storage::append_log(&cfg.path, &desc, cfg.timestamp_format)?;
             print_balance(0);
         }
         Some(Commands::Log { last, today, yesterday, week, month, since, until, summary }) => {
