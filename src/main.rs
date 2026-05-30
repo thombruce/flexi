@@ -76,6 +76,8 @@ enum Commands {
         #[arg(long)]
         summary: bool,
     },
+    /// Open the log file in $EDITOR
+    Edit,
     /// Undo the last change
     Undo,
     /// Copy flexi balance to clipboard
@@ -290,6 +292,13 @@ fn main() -> Result<()> {
                     print_log_entry(entry);
                 }
             }
+        }
+        Some(Commands::Edit) => {
+            let editor = std::env::var("EDITOR").unwrap_or_else(|_| "vi".to_string());
+            std::process::Command::new(&editor)
+                .arg(&cfg.path)
+                .status()
+                .with_context(|| format!("failed to launch editor {:?}", editor))?;
         }
         Some(Commands::Undo) => {
             match storage::pop_log(&cfg.path)? {
