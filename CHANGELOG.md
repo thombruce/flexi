@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 - `flexi log --yesterday` — filter log entries to yesterday only
+- `--note`/`-m` flag on `add`, `remove`, `set` — attach freeform annotation to a log entry (e.g. `flexi add --note "stayed late" 1 hr`); displayed dimmed in `flexi log`
 
 ## [0.9.0] - 2026-05-29
 

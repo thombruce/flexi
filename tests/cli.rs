@@ -429,3 +429,38 @@ fn log_filter_week_start_sunday() {
     assert_eq!(lines.len(), 1);
     assert!(lines[0].contains("+30 min"));
 }
+
+// --- note tests ---
+
+#[test]
+fn note_stored_in_log() {
+    let dir = tempdir().unwrap();
+    flexi(&["add", "--note", "overtime", "30", "min"], dir.path()).success();
+    let log = fs::read_to_string(dir.path().join("flexi").join("flexi.txt")).unwrap();
+    assert!(log.contains("# overtime"));
+}
+
+#[test]
+fn note_displayed_in_log() {
+    let dir = tempdir().unwrap();
+    flexi(&["add", "--note", "overtime", "30", "min"], dir.path()).success();
+    let lines = log_lines(dir.path(), &[]);
+    assert_eq!(lines.len(), 1);
+    assert!(lines[0].contains("# overtime"));
+}
+
+#[test]
+fn note_does_not_break_balance() {
+    let dir = tempdir().unwrap();
+    flexi(&["add", "--note", "test note", "1", "hr"], dir.path()).success();
+    flexi(&[], dir.path()).success().stdout("1 hr\n");
+}
+
+#[test]
+fn note_on_set() {
+    let dir = tempdir().unwrap();
+    flexi(&["set", "-m", "manual correction", "1", "hr"], dir.path()).success();
+    let log = fs::read_to_string(dir.path().join("flexi").join("flexi.txt")).unwrap();
+    assert!(log.contains("# manual correction"));
+    flexi(&[], dir.path()).success().stdout("1 hr\n");
+}

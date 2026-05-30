@@ -10,7 +10,8 @@ pub struct LogEntry {
 
 impl LogEntry {
     pub fn delta_minutes(&self) -> Option<i32> {
-        let desc = self.description
+        let base = self.description.split(" # ").next().unwrap_or(&self.description);
+        let desc = base
             .replace(" -> ", " > ")
             .replace(" \u{2192} ", " > ");
         let pos = desc.find(" > ")?;
@@ -18,13 +19,14 @@ impl LogEntry {
     }
 
     pub fn new_minutes(&self) -> Result<i32> {
-        if let Some(pos) = self.description.rfind(" > ") {
-            parse_duration(&self.description[pos + 3..])
-        } else if let Some(pos) = self.description.rfind(" \u{2192} ") {
-            parse_duration(&self.description[pos + 4..])
-        } else if let Some(pos) = self.description.rfind(" -> ") {
-            parse_duration(&self.description[pos + 4..])
-        } else if let Some(stripped) = self.description.strip_prefix("= ") {
+        let desc = self.description.split(" # ").next().unwrap_or(&self.description);
+        if let Some(pos) = desc.rfind(" > ") {
+            parse_duration(&desc[pos + 3..])
+        } else if let Some(pos) = desc.rfind(" \u{2192} ") {
+            parse_duration(&desc[pos + 4..])
+        } else if let Some(pos) = desc.rfind(" -> ") {
+            parse_duration(&desc[pos + 4..])
+        } else if let Some(stripped) = desc.strip_prefix("= ") {
             parse_duration(stripped)
         } else {
             anyhow::bail!("cannot parse value from log entry: {:?}", self.description)

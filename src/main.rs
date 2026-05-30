@@ -22,17 +22,26 @@ enum Commands {
     Add {
         #[arg(trailing_var_arg = true, required = true)]
         time: Vec<String>,
+        /// Attach a note to this log entry
+        #[arg(long, short = 'm')]
+        note: Option<String>,
     },
     /// Remove time from your flexi balance
     #[command(alias = "rm")]
     Remove {
         #[arg(trailing_var_arg = true, required = true)]
         time: Vec<String>,
+        /// Attach a note to this log entry
+        #[arg(long, short = 'm')]
+        note: Option<String>,
     },
     /// Set your flexi balance to an exact value
     Set {
         #[arg(trailing_var_arg = true, required = true)]
         time: Vec<String>,
+        /// Attach a note to this log entry
+        #[arg(long, short = 'm')]
+        note: Option<String>,
     },
     /// Reset your flexi balance to zero
     Reset,
@@ -107,10 +116,13 @@ fn print_change(change: i32, new: i32) {
     print_balance(new);
 }
 
-fn record_change(cfg: &config::ResolvedConfig, current: i32, new: i32) -> anyhow::Result<()> {
+fn record_change(cfg: &config::ResolvedConfig, current: i32, new: i32, note: Option<&str>) -> anyhow::Result<()> {
     let change = new - current;
     let sign = if change >= 0 { "+" } else { "" };
-    let desc = format!("{}{} > {}", sign, time::format_duration(change), time::format_duration(new));
+    let mut desc = format!("{}{} > {}", sign, time::format_duration(change), time::format_duration(new));
+    if let Some(n) = note {
+        desc.push_str(&format!(" # {}", n));
+    }
     storage::append_log(&cfg.path, &desc, cfg.timestamp_format)?;
     print_change(change, new);
     Ok(())
@@ -129,17 +141,26 @@ fn print_balance(mins: i32) {
 
 fn print_log_entry(entry: &storage::LogEntry) {
     let ts = entry.timestamp.get(..16).unwrap_or(&entry.timestamp).replace('T', " ");
-    let description = entry.description
+    let (body, note) = match entry.description.split_once(" # ") {
+        Some((b, n)) => (b.to_string(), Some(n.to_string())),
+        None => (entry.description.clone(), None),
+    };
+    let body = body
         .replace(" > ", " → ")
         .replace(" -> ", " → ");
-    let desc = if description.starts_with('+') {
-        description.if_supports_color(Stdout, |t| t.green()).to_string()
-    } else if description.starts_with('-') {
-        description.if_supports_color(Stdout, |t| t.red()).to_string()
+    let colored = if body.starts_with('+') {
+        body.if_supports_color(Stdout, |t| t.green()).to_string()
+    } else if body.starts_with('-') {
+        body.if_supports_color(Stdout, |t| t.red()).to_string()
     } else {
-        description
+        body
     };
-    println!("{}  {}", ts, desc);
+    if let Some(n) = note {
+        let note_str = format!("  # {}", n);
+        println!("{}  {}{}", ts, colored, note_str.if_supports_color(Stdout, |t| t.dimmed()));
+    } else {
+        println!("{}  {}", ts, colored);
+    }
 }
 
 fn main() -> Result<()> {
@@ -157,19 +178,22 @@ fn main() -> Result<()> {
             let mins = storage::read_minutes(&cfg.path)?;
             print_balance(mins);
         }
-        Some(Commands::Add { time }) => {
+        Some(Commands::Add { time, note }) => {
             let delta = time::parse_duration(&time.join(" "))?;
             let current = storage::read_minutes(&cfg.path)?;
-            record_change(&cfg, current, current + delta)?;
+            record_change(&cfg, current, current + delta, note.as_deref())?;
         }
-        Some(Commands::Remove { time }) => {
+        Some(Commands::Remove { time, note }) => {
             let delta = time::parse_duration(&time.join(" "))?;
             let current = storage::read_minutes(&cfg.path)?;
-            record_change(&cfg, current, current - delta)?;
+            record_change(&cfg, current, current - delta, note.as_deref())?;
         }
-        Some(Commands::Set { time }) => {
+        Some(Commands::Set { time, note }) => {
             let mins = time::parse_duration(&time.join(" "))?;
-            let desc = format!("= {}", time::format_duration(mins));
+            let mut desc = format!("= {}", time::format_duration(mins));
+            if let Some(n) = note {
+                desc.push_str(&format!(" # {}", n));
+            }
             storage::append_log(&cfg.path, &desc, cfg.timestamp_format)?;
             print_balance(mins);
         }
