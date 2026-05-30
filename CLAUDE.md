@@ -8,6 +8,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 cargo build          # compile
 cargo run            # run (display balance)
 cargo run -- add 1 hr 30 min
+cargo run -- add 1 hr 30 min --note "reason"
 cargo run -- remove 30 min
 cargo test           # run all tests
 cargo test time      # run tests in a specific module
@@ -24,7 +25,7 @@ Single binary crate. All state is `i32` minutes internally; `time.rs` owns the b
 **Modules:**
 - `time.rs` — `parse_duration(s) -> i32`, `format_duration(i32) -> String`. All format rules live here. Negative balance renders as `-X hr Y min`.
 - `config.rs` — reads `~/.config/flexi/flexi.toml` (optional `path` and `timestamp_format` keys). Falls back to `~/.local/share/flexi/flexi.txt`.
-- `storage.rs` — `flexi.txt` is the log (single file). `append_log`, `read_log`, `pop_log` all operate on this path. `read_minutes` derives current balance by parsing the last entry's description (`new_minutes()`). Log format: `timestamp description` — timestamp is fixed-width (16 chars simple, 25 chars full), parsed by position so any whitespace separator is accepted. Writes are atomic via `.tmp`.
+- `storage.rs` — `flexi.txt` is the log (single file). `append_log`, `read_log`, `pop_log` all operate on this path. `read_minutes` derives current balance by parsing the last entry's description (`new_minutes()`). Log format: `timestamp description` — timestamp is fixed-width (16 chars simple, 25 chars full), parsed by position so any whitespace separator is accepted. Writes are atomic via `.tmp`. Notes are stored as ` # text` suffix in the description (e.g. `+30 min > 2 hr # stayed late`); both `delta_minutes()` and `new_minutes()` strip everything from ` # ` onward before parsing.
 - `main.rs` — clap CLI only; no business logic.
 
 **Time string format:** `N hr M min`, `N hr`, `M min`, `0 min`. Accepts plural/abbreviated unit words (`hour`, `hours`, `hrs`, `minute`, `minutes`, `mins`). Order must be hours before minutes.
@@ -35,6 +36,10 @@ path = "/custom/path/to/flexi.txt"
 timestamp_format = "simple"   # "simple" (default): "2026-05-24 10:20"  |  "full": "2026-05-24T10:20:16+01:00"
 week_start = "monday"         # "monday" (default) | "sunday"
 ```
+
+## Documentation
+
+Update `README.md` whenever user-facing behaviour changes (new commands, flags, config keys, output format). Update `CLAUDE.md` when architecture or conventions change.
 
 ## Releases
 

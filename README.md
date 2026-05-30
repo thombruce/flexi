@@ -25,11 +25,13 @@ cargo install --path .
 ```sh
 flexi                      # display current balance
 flexi add 1 hr 30 min     # add time
+flexi add 1 hr --note "reason"  # add time with annotation
 flexi remove 1 hr          # subtract time (alias: rm)
 flexi set 2 hr             # set balance to exact value
 flexi reset                # reset balance to zero
 flexi log                  # show change history
 flexi log --today          # today only (alias: --day)
+flexi log --yesterday      # yesterday only
 flexi log --week           # current calendar week
 flexi log --month          # current calendar month
 flexi log --since 2026-05-01 --until 2026-05-24  # date range
@@ -40,7 +42,9 @@ flexi copy                 # copy balance to clipboard (alias: cp)
 flexi completions <shell>  # print shell completion script
 ```
 
-`add` and `remove` print the change and new balance (e.g. `+1 hr 30 min → 3 hr`). `set` and `reset` print the new balance. `log` prints one entry per line: `2026-05-24 10:20  +1 hr 30 min → 3 hr`.
+`add` and `remove` print the change and new balance (e.g. `+1 hr 30 min → 3 hr`). `set` and `reset` print the new balance. `log` prints one entry per line: `2026-05-24 10:20  +1 hr 30 min → 3 hr`. Notes appear dimmed at the end: `2026-05-24 10:20  +1 hr 30 min → 3 hr  # reason`.
+
+`--note`/`-m` works on `add`, `remove`, and `set`. Place it before or after the time args.
 
 Quotes are optional — `flexi add 1h30m` and `flexi add "1h30m"` are equivalent.
 
