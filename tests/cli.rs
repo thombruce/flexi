@@ -1,4 +1,5 @@
 use assert_cmd::Command;
+use chrono::Local;
 use std::fs;
 use std::path::Path;
 use tempfile::tempdir;
@@ -261,6 +262,19 @@ fn log_filter_today() {
     let lines = log_lines(dir.path(), &["--today"]);
     assert_eq!(lines.len(), 1);
     assert!(lines[0].contains("+30 min"));
+}
+
+#[test]
+fn log_filter_yesterday() {
+    let dir = tempdir().unwrap();
+    let yesterday = (Local::now() - chrono::Duration::days(1))
+        .format("%Y-%m-%d")
+        .to_string();
+    write_log(dir.path(), &format!("{} 09:00 = 1 hr\n", yesterday));
+    flexi(&["add", "30", "min"], dir.path()).success();
+    let lines = log_lines(dir.path(), &["--yesterday"]);
+    assert_eq!(lines.len(), 1);
+    assert!(lines[0].contains("= 1 hr"));
 }
 
 #[test]

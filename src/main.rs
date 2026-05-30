@@ -42,19 +42,22 @@ enum Commands {
         #[arg(long, short = 'n')]
         last: Option<usize>,
         /// Show entries from today only
-        #[arg(long, alias = "day", conflicts_with_all = ["week", "month", "since", "until"])]
+        #[arg(long, alias = "day", conflicts_with_all = ["yesterday", "week", "month", "since", "until"])]
         today: bool,
+        /// Show entries from yesterday only
+        #[arg(long, conflicts_with_all = ["today", "week", "month", "since", "until"])]
+        yesterday: bool,
         /// Show entries from the current calendar week
-        #[arg(long, conflicts_with_all = ["today", "month", "since", "until"])]
+        #[arg(long, conflicts_with_all = ["today", "yesterday", "month", "since", "until"])]
         week: bool,
         /// Show entries from the current calendar month
-        #[arg(long, conflicts_with_all = ["today", "week", "since", "until"])]
+        #[arg(long, conflicts_with_all = ["today", "yesterday", "week", "since", "until"])]
         month: bool,
         /// Show entries on or after this date (YYYY-MM-DD)
-        #[arg(long, conflicts_with_all = ["today", "week", "month"])]
+        #[arg(long, conflicts_with_all = ["today", "yesterday", "week", "month"])]
         since: Option<String>,
         /// Show entries on or before this date (YYYY-MM-DD)
-        #[arg(long, conflicts_with_all = ["today", "week", "month"])]
+        #[arg(long, conflicts_with_all = ["today", "yesterday", "week", "month"])]
         until: Option<String>,
         /// Show totals instead of individual entries
         #[arg(long)]
@@ -174,7 +177,7 @@ fn main() -> Result<()> {
             storage::append_log(&cfg.path, "= 0 min", cfg.timestamp_format)?;
             print_balance(0);
         }
-        Some(Commands::Log { last, today, week, month, since, until, summary }) => {
+        Some(Commands::Log { last, today, yesterday, week, month, since, until, summary }) => {
             let entries = storage::read_log(&cfg.path)?;
 
             let now = chrono::Local::now().date_naive();
@@ -184,6 +187,10 @@ fn main() -> Result<()> {
             if today {
                 since_date = Some(now);
                 until_date = Some(now);
+            } else if yesterday {
+                let y = now - chrono::Duration::days(1);
+                since_date = Some(y);
+                until_date = Some(y);
             } else if week {
                 let days_from_start = match cfg.week_start {
                     config::WeekStart::Monday => now.weekday().num_days_from_monday(),
