@@ -2,6 +2,17 @@
 
 A minimal CLI tool for tracking your flexi-time balance.
 
+## Quickstart
+
+```sh
+cargo install flexi
+flexi set 3 hr # set your bank
+flexi add 1 hr 30 min # add to your bank
+flexi remove 1 hr # subtract from your bank
+flexi log # show change history
+flexi # show current balance (3 hr 30 min)
+```
+
 ## Installation
 
 **Homebrew** (macOS/Linux):
