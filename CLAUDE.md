@@ -49,6 +49,6 @@ Before tagging, move `CHANGELOG.md`'s `[Unreleased]` section to a new version he
 
 **GitHub Releases** build automatically via `.github/workflows/release.yml` on `git tag vX.Y.Z && git push --tags`.
 
-**crates.io:** `cargo publish` (requires `cargo login` first).
+**crates.io:** published automatically on release via `.github/workflows/release.yml` (requires the `CARGO_REGISTRY_TOKEN` repo secret). To publish manually instead: `cargo publish` (requires `cargo login` first).
 
 **Homebrew tap:** updated automatically on release via the Git workflow.
