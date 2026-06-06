@@ -16,6 +16,13 @@ struct Cli {
     command: Option<Commands>,
 }
 
+fn parse_note(s: &str) -> Result<String, String> {
+    if s.contains('\n') || s.contains('\r') {
+        return Err("note must not contain newlines".to_string());
+    }
+    Ok(s.to_string())
+}
+
 #[derive(Subcommand)]
 enum Commands {
     /// Add time to your flexi balance
@@ -23,7 +30,7 @@ enum Commands {
         #[arg(required = true)]
         time: Vec<String>,
         /// Attach a note to this log entry
-        #[arg(long, short = 'm')]
+        #[arg(long, short = 'm', value_parser = parse_note)]
         note: Option<String>,
     },
     /// Remove time from your flexi balance
@@ -32,7 +39,7 @@ enum Commands {
         #[arg(required = true)]
         time: Vec<String>,
         /// Attach a note to this log entry
-        #[arg(long, short = 'm')]
+        #[arg(long, short = 'm', value_parser = parse_note)]
         note: Option<String>,
     },
     /// Set your flexi balance to an exact value
@@ -40,13 +47,13 @@ enum Commands {
         #[arg(required = true)]
         time: Vec<String>,
         /// Attach a note to this log entry
-        #[arg(long, short = 'm')]
+        #[arg(long, short = 'm', value_parser = parse_note)]
         note: Option<String>,
     },
     /// Reset your flexi balance to zero
     Reset {
         /// Attach a note to this log entry
-        #[arg(long, short = 'm')]
+        #[arg(long, short = 'm', value_parser = parse_note)]
         note: Option<String>,
     },
     /// Show balance change history
@@ -115,8 +122,10 @@ fn print_change(change: i32, new: i32) {
     let delta = format!("{}{}", sign, time::format_duration(change));
     let delta_colored = if change > 0 {
         delta.if_supports_color(Stdout, |t| t.green()).to_string()
-    } else {
+    } else if change < 0 {
         delta.if_supports_color(Stdout, |t| t.red()).to_string()
+    } else {
+        delta
     };
     print!("{} → ", delta_colored);
     print_balance(new);

@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+- Notes containing newlines are now rejected instead of silently corrupting the log file
+- Zero-delta changes (e.g. `add 0 min`) no longer render in red
+
+### Changed
+- `add`/`remove`/`set`/`reset` now append to the log file in place instead of rewriting it on every change
+- Reading the current balance now parses only the last log entry instead of the whole file
+
 ## [0.11.0] - 2026-05-30
 
 ### Added

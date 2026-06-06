@@ -45,16 +45,14 @@ pub fn append_log(path: &Path, description: &str, ts_format: TimestampFormat) ->
         TimestampFormat::Full => now.to_rfc3339_opts(chrono::SecondsFormat::Secs, false),
     };
     let line = format!("{} {}\n", timestamp, description);
-    let tmp = path.with_extension("tmp");
-    let existing = if path.exists() {
-        std::fs::read_to_string(path).with_context(|| format!("reading {:?}", path))?
-    } else {
-        String::new()
-    };
-    std::fs::write(&tmp, existing + &line)
-        .with_context(|| format!("writing {:?}", tmp))?;
-    std::fs::rename(&tmp, path)
-        .with_context(|| format!("renaming {:?} to {:?}", tmp, path))
+    use std::io::Write;
+    let mut file = std::fs::OpenOptions::new()
+        .create(true)
+        .append(true)
+        .open(path)
+        .with_context(|| format!("opening {:?}", path))?;
+    file.write_all(line.as_bytes())
+        .with_context(|| format!("writing {:?}", path))
 }
 
 pub fn read_log(path: &Path) -> Result<Vec<LogEntry>> {
@@ -100,10 +98,14 @@ fn parse_log_line(line: &str) -> Result<LogEntry> {
 }
 
 pub fn read_minutes(path: &Path) -> Result<i32> {
-    let entries = read_log(path)?;
-    match entries.last() {
+    if !path.exists() {
+        return Ok(0);
+    }
+    let raw = std::fs::read_to_string(path)
+        .with_context(|| format!("reading {:?}", path))?;
+    match raw.lines().rev().find(|l| !l.is_empty()) {
         None => Ok(0),
-        Some(e) => e.new_minutes(),
+        Some(line) => parse_log_line(line)?.new_minutes(),
     }
 }
 
