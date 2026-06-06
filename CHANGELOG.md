@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.11.1] - 2026-06-06
+
 ### Fixed
 - Notes containing newlines are now rejected instead of silently corrupting the log file
 - Zero-delta changes (e.g. `add 0 min`) no longer render in red
