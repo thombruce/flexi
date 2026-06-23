@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.12.0] - 2026-06-23
+
 ### Added
 
 - `flexi log --prose` — describes the period's change and current balance in a plain sentence (e.g. `Today: banked 1 hr 30 min (added 2 hr, removed 30 min). Balance now 1 hr 30 min.`). Works with any date filter (`--today`, `--week`, `--since`, etc.); conflicts with `--summary`.
