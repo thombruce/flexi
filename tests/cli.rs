@@ -428,6 +428,143 @@ fn log_summary_with_until() {
     assert!(lines[2].contains("+1 hr"));   // Net
 }
 
+fn prose_out(dir: &Path, args: &[&str]) -> String {
+    let mut full = vec!["log"];
+    full.extend_from_slice(args);
+    full.push("--prose");
+    let out = flexi(&full, dir).success().get_output().stdout.clone();
+    String::from_utf8_lossy(&out).trim_end().to_string()
+}
+
+#[test]
+fn prose_both_sides() {
+    let dir = tempdir().unwrap();
+    let today = Local::now().format("%Y-%m-%d");
+    write_log(dir.path(), &format!("\
+{today} 09:00 +2 hr → 2 hr\n\
+{today} 12:00 -30 min → 1 hr 30 min\n"));
+    let line = prose_out(dir.path(), &["--today"]);
+    assert_eq!(line, "Today: banked 1 hr 30 min (added 2 hr, removed 30 min). Balance now 1 hr 30 min.");
+}
+
+#[test]
+fn prose_only_adds_omits_breakdown() {
+    let dir = tempdir().unwrap();
+    let today = Local::now().format("%Y-%m-%d");
+    write_log(dir.path(), &format!("{today} 09:00 +2 hr → 2 hr\n"));
+    let line = prose_out(dir.path(), &["--today"]);
+    assert_eq!(line, "Today: banked 2 hr. Balance now 2 hr.");
+}
+
+#[test]
+fn prose_net_negative_uses_used() {
+    let dir = tempdir().unwrap();
+    let today = Local::now().format("%Y-%m-%d");
+    write_log(dir.path(), &format!("\
+{today} 09:00 +30 min → 30 min\n\
+{today} 12:00 -2 hr → -1 hr 30 min\n"));
+    let line = prose_out(dir.path(), &["--today"]);
+    assert_eq!(line, "Today: used 1 hr 30 min (added 30 min, removed 2 hr). Balance now -1 hr 30 min.");
+}
+
+#[test]
+fn prose_net_zero_when_changes_cancel() {
+    let dir = tempdir().unwrap();
+    let today = Local::now().format("%Y-%m-%d");
+    write_log(dir.path(), &format!("\
+{today} 09:00 +1 hr → 1 hr\n\
+{today} 12:00 -1 hr → 0 min\n"));
+    let line = prose_out(dir.path(), &["--today"]);
+    assert_eq!(line, "Today: net zero (added 1 hr, removed 1 hr). Balance now 0 min.");
+}
+
+#[test]
+fn prose_no_change_for_empty_window() {
+    let dir = tempdir().unwrap();
+    let today = Local::now().format("%Y-%m-%d");
+    write_log(dir.path(), &format!("{today} 09:00 +1 hr → 1 hr\n"));
+    let line = prose_out(dir.path(), &["--yesterday"]);
+    assert_eq!(line, "Yesterday: no change. Balance now 1 hr.");
+}
+
+#[test]
+fn prose_label_since() {
+    let dir = tempdir().unwrap();
+    write_log(dir.path(), "2026-05-15 10:00 +30 min → 30 min\n");
+    let line = prose_out(dir.path(), &["--since", "2026-05-01"]);
+    assert_eq!(line, "Since 2026-05-01: banked 30 min. Balance now 30 min.");
+}
+
+#[test]
+fn prose_label_until() {
+    let dir = tempdir().unwrap();
+    write_log(dir.path(), "2026-05-15 10:00 +30 min → 30 min\n");
+    let line = prose_out(dir.path(), &["--until", "2026-05-31"]);
+    assert_eq!(line, "Up to 2026-05-31: banked 30 min. Balance now 30 min.");
+}
+
+#[test]
+fn prose_label_range() {
+    let dir = tempdir().unwrap();
+    write_log(dir.path(), "2026-05-15 10:00 +30 min → 30 min\n");
+    let line = prose_out(dir.path(), &["--since", "2026-05-01", "--until", "2026-05-31"]);
+    assert!(line.starts_with("Between 2026-05-01 and 2026-05-31: banked 30 min"));
+}
+
+#[test]
+fn prose_label_overall() {
+    let dir = tempdir().unwrap();
+    write_log(dir.path(), "2026-05-15 10:00 +30 min → 30 min\n");
+    let line = prose_out(dir.path(), &[]);
+    assert_eq!(line, "Overall: banked 30 min. Balance now 30 min.");
+}
+
+#[test]
+fn prose_label_yesterday() {
+    let dir = tempdir().unwrap();
+    let yesterday = (Local::now() - chrono::Duration::days(1))
+        .format("%Y-%m-%d")
+        .to_string();
+    write_log(dir.path(), &format!("{yesterday} 09:00 +30 min → 30 min\n"));
+    let line = prose_out(dir.path(), &["--yesterday"]);
+    assert_eq!(line, "Yesterday: banked 30 min. Balance now 30 min.");
+}
+
+#[test]
+fn prose_label_week() {
+    let dir = tempdir().unwrap();
+    let today = Local::now().format("%Y-%m-%d");
+    write_log(dir.path(), &format!("{today} 09:00 +30 min → 30 min\n"));
+    let line = prose_out(dir.path(), &["--week"]);
+    assert_eq!(line, "This week: banked 30 min. Balance now 30 min.");
+}
+
+#[test]
+fn prose_label_month() {
+    let dir = tempdir().unwrap();
+    let today = Local::now().format("%Y-%m-%d");
+    write_log(dir.path(), &format!("{today} 09:00 +30 min → 30 min\n"));
+    let line = prose_out(dir.path(), &["--month"]);
+    assert_eq!(line, "This month: banked 30 min. Balance now 30 min.");
+}
+
+#[test]
+fn prose_balance_reflects_set_but_excludes_from_totals() {
+    let dir = tempdir().unwrap();
+    write_log(dir.path(), "\
+2026-05-01 09:00 +1 hr → 1 hr\n\
+2026-05-02 09:00 = 5 hr\n");
+    // `set` does not count as added/removed, but balance shows its value.
+    let line = prose_out(dir.path(), &[]);
+    assert_eq!(line, "Overall: banked 1 hr. Balance now 5 hr.");
+}
+
+#[test]
+fn prose_conflicts_with_summary() {
+    let dir = tempdir().unwrap();
+    flexi(&["log", "--prose", "--summary"], dir.path()).failure();
+}
+
 #[test]
 fn log_filter_week_start_sunday() {
     let dir = tempdir().unwrap();

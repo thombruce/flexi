@@ -49,6 +49,7 @@ flexi log --month          # current calendar month
 flexi log --since 2026-05-01 --until 2026-05-24  # date range
 flexi log --last 10        # last 10 entries (combinable with filters)
 flexi log --week --summary # totals for current week (added, removed, net)
+flexi log --today --prose  # plain-sentence summary of the period and balance
 flexi edit                 # open log file in $EDITOR
 flexi undo                 # undo last change
 flexi copy                 # copy balance to clipboard (alias: cp)

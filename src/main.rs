@@ -82,6 +82,9 @@ enum Commands {
         /// Show totals instead of individual entries
         #[arg(long)]
         summary: bool,
+        /// Describe the change in plain sentences
+        #[arg(long, conflicts_with = "summary")]
+        prose: bool,
     },
     /// Open the log file in $EDITOR
     Edit,
@@ -154,6 +157,53 @@ fn print_balance(mins: i32) {
     }
 }
 
+fn print_prose(label: &str, added: i32, removed: i32, balance: i32) {
+    let net = added + removed;
+    let bal = {
+        let f = time::format_duration(balance);
+        if balance > 0 {
+            f.if_supports_color(Stdout, |t| t.green()).to_string()
+        } else if balance < 0 {
+            f.if_supports_color(Stdout, |t| t.red()).to_string()
+        } else {
+            f
+        }
+    };
+
+    if added == 0 && removed == 0 {
+        println!("{}: no change. Balance now {}.", label, bal);
+        return;
+    }
+
+    let breakdown = format!(
+        "(added {}, removed {})",
+        time::format_duration(added),
+        time::format_duration(removed.abs())
+    );
+
+    if net > 0 {
+        let mag = time::format_duration(net)
+            .if_supports_color(Stdout, |t| t.green())
+            .to_string();
+        if added != 0 && removed != 0 {
+            println!("{}: banked {} {}. Balance now {}.", label, mag, breakdown, bal);
+        } else {
+            println!("{}: banked {}. Balance now {}.", label, mag, bal);
+        }
+    } else if net < 0 {
+        let mag = time::format_duration(net.abs())
+            .if_supports_color(Stdout, |t| t.red())
+            .to_string();
+        if added != 0 && removed != 0 {
+            println!("{}: used {} {}. Balance now {}.", label, mag, breakdown, bal);
+        } else {
+            println!("{}: used {}. Balance now {}.", label, mag, bal);
+        }
+    } else {
+        println!("{}: net zero {}. Balance now {}.", label, breakdown, bal);
+    }
+}
+
 fn print_log_entry(entry: &storage::LogEntry) {
     let ts = entry.timestamp.get(..16).unwrap_or(&entry.timestamp).replace('T', " ");
     let (body, note) = match entry.description.split_once(" # ") {
@@ -220,7 +270,7 @@ fn main() -> Result<()> {
             storage::append_log(&cfg.path, &desc, cfg.timestamp_format)?;
             print_balance(0);
         }
-        Some(Commands::Log { last, today, yesterday, week, month, since, until, summary }) => {
+        Some(Commands::Log { last, today, yesterday, week, month, since, until, summary, prose }) => {
             let entries = storage::read_log(&cfg.path)?;
 
             let now = chrono::Local::now().date_naive();
@@ -273,7 +323,7 @@ fn main() -> Result<()> {
                 }
             }
 
-            if summary {
+            if summary || prose {
                 let added: i32 = filtered.iter()
                     .filter_map(|e| e.delta_minutes())
                     .filter(|&d| d > 0)
@@ -283,18 +333,39 @@ fn main() -> Result<()> {
                     .filter(|&d| d < 0)
                     .sum();
                 let net = added + removed;
-                let added_str = time::format_duration(added);
-                let removed_str = time::format_duration(removed);
-                let net_sign = if net >= 0 { "+" } else { "" };
-                let net_str = format!("{}{}", net_sign, time::format_duration(net));
-                println!("Added:   {}", added_str.if_supports_color(Stdout, |t| t.green()));
-                println!("Removed: {}", removed_str.if_supports_color(Stdout, |t| t.red()));
-                if net > 0 {
-                    println!("Net:     {}", net_str.if_supports_color(Stdout, |t| t.green()));
-                } else if net < 0 {
-                    println!("Net:     {}", net_str.if_supports_color(Stdout, |t| t.red()));
+                if prose {
+                    let label = if today {
+                        "Today".to_string()
+                    } else if yesterday {
+                        "Yesterday".to_string()
+                    } else if week {
+                        "This week".to_string()
+                    } else if month {
+                        "This month".to_string()
+                    } else {
+                        match (since.as_deref(), until.as_deref()) {
+                            (Some(s), Some(u)) => format!("Between {} and {}", s, u),
+                            (Some(s), None) => format!("Since {}", s),
+                            (None, Some(u)) => format!("Up to {}", u),
+                            (None, None) => "Overall".to_string(),
+                        }
+                    };
+                    let balance = storage::read_minutes(&cfg.path)?;
+                    print_prose(&label, added, removed, balance);
                 } else {
-                    println!("Net:     {}", net_str);
+                    let added_str = time::format_duration(added);
+                    let removed_str = time::format_duration(removed);
+                    let net_sign = if net >= 0 { "+" } else { "" };
+                    let net_str = format!("{}{}", net_sign, time::format_duration(net));
+                    println!("Added:   {}", added_str.if_supports_color(Stdout, |t| t.green()));
+                    println!("Removed: {}", removed_str.if_supports_color(Stdout, |t| t.red()));
+                    if net > 0 {
+                        println!("Net:     {}", net_str.if_supports_color(Stdout, |t| t.green()));
+                    } else if net < 0 {
+                        println!("Net:     {}", net_str.if_supports_color(Stdout, |t| t.red()));
+                    } else {
+                        println!("Net:     {}", net_str);
+                    }
                 }
             } else {
                 for entry in &filtered {
