@@ -475,19 +475,19 @@ fn main() -> Result<()> {
         }
         Some(Commands::Add { time, note }) => {
             ensure_not_clocked_in(&cfg)?;
-            let delta = time::parse_duration(&time.join(" "))?;
+            let delta = time::round_to_increment(time::parse_duration(&time.join(" "))?, cfg.increment);
             let current = storage::read_minutes(&cfg.path)?;
             record_change(&cfg, current, current + delta, note.as_deref())?;
         }
         Some(Commands::Remove { time, note }) => {
             ensure_not_clocked_in(&cfg)?;
-            let delta = time::parse_duration(&time.join(" "))?;
+            let delta = time::round_to_increment(time::parse_duration(&time.join(" "))?, cfg.increment);
             let current = storage::read_minutes(&cfg.path)?;
             record_change(&cfg, current, current - delta, note.as_deref())?;
         }
         Some(Commands::Set { time, note }) => {
             ensure_not_clocked_in(&cfg)?;
-            let mins = time::parse_duration(&time.join(" "))?;
+            let mins = time::round_to_increment(time::parse_duration(&time.join(" "))?, cfg.increment);
             let mut desc = format!("= {}", time::format_duration(mins));
             if let Some(n) = note {
                 desc.push_str(&format!(" # {}", n));
@@ -514,7 +514,7 @@ fn main() -> Result<()> {
             if elapsed < 0 {
                 anyhow::bail!("clock-in time is in the future; not banking");
             }
-            let elapsed = elapsed as i32;
+            let elapsed = time::round_to_increment(elapsed as i32, cfg.increment);
             let balance = entry.new_minutes()?;
             storage::pop_log(&cfg.path)?;
             let span = format!("{}–{}", start.format("%H:%M"), now.format("%H:%M"));

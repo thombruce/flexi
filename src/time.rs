@@ -73,6 +73,19 @@ fn parse_spaced(s: &str) -> Result<i32> {
     Ok(total_mins)
 }
 
+/// Rounds a duration to the nearest multiple of `increment` minutes (half away
+/// from zero). `increment <= 1` is a no-op. Sign is preserved so debit deltas
+/// round symmetrically.
+pub fn round_to_increment(mins: i32, increment: i32) -> i32 {
+    if increment <= 1 {
+        return mins;
+    }
+    let sign = if mins < 0 { -1 } else { 1 };
+    let abs = mins.abs();
+    let rounded = ((abs + increment / 2) / increment) * increment;
+    sign * rounded
+}
+
 pub fn format_duration(total_mins: i32) -> String {
     let negative = total_mins < 0;
     let abs = total_mins.unsigned_abs() as i32;
@@ -195,5 +208,35 @@ mod tests {
     fn parse_european_decimal() {
         assert_eq!(parse_duration("1,5").unwrap(), 90);
         assert_eq!(parse_duration("1,5 hours").unwrap(), 90);
+    }
+
+    #[test]
+    fn round_increment_one_is_noop() {
+        assert_eq!(round_to_increment(7, 1), 7);
+        assert_eq!(round_to_increment(-7, 1), -7);
+        assert_eq!(round_to_increment(7, 0), 7);
+    }
+
+    #[test]
+    fn round_increment_nearest() {
+        assert_eq!(round_to_increment(7, 15), 0);
+        assert_eq!(round_to_increment(8, 15), 15);
+        assert_eq!(round_to_increment(22, 15), 15);
+        assert_eq!(round_to_increment(23, 15), 30);
+        assert_eq!(round_to_increment(0, 15), 0);
+        assert_eq!(round_to_increment(15, 15), 15);
+    }
+
+    #[test]
+    fn round_increment_half_rounds_up() {
+        assert_eq!(round_to_increment(5, 10), 10);
+        assert_eq!(round_to_increment(4, 10), 0);
+    }
+
+    #[test]
+    fn round_increment_negative_symmetric() {
+        assert_eq!(round_to_increment(-7, 15), 0);
+        assert_eq!(round_to_increment(-8, 15), -15);
+        assert_eq!(round_to_increment(-23, 15), -30);
     }
 }

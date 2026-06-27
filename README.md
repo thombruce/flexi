@@ -120,6 +120,7 @@ Create `~/.config/flexi/flexi.toml` to configure flexi:
 path = "/path/to/flexi.txt"
 timestamp_format = "simple"  # "simple" (default) or "full"
 week_start = "monday"        # "monday" (default) or "sunday"
+increment = 1                # round durations to this many minutes (default 1 = no rounding)
 ```
 
 | `timestamp_format` | Example |
@@ -131,6 +132,8 @@ week_start = "monday"        # "monday" (default) or "sunday"
 |--------------|-------------|
 | `monday` (default) | Week starts on Monday |
 | `sunday` | Week starts on Sunday |
+
+`increment` rounds every duration that changes the balance (`add`, `remove`, `set`, and `in`/`out` elapsed) to the nearest multiple of that many minutes — half rounds up. For example, with `increment = 15` a 1 hr 7 min session banks 1 hr and a 1 hr 8 min session banks 1 hr 15 min. The default `1` records exact minutes. Must be at least 1.
 
 Without config, data is stored at `~/.local/share/flexi/flexi.txt` (or the platform equivalent). This file is the change log — the current balance is derived from the last entry.
 

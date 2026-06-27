@@ -35,7 +35,10 @@ Single binary crate. All state is `i32` minutes internally; `time.rs` owns the b
 path = "/custom/path/to/flexi.txt"
 timestamp_format = "simple"   # "simple" (default): "2026-05-24 10:20"  |  "full": "2026-05-24T10:20:16+01:00"
 week_start = "monday"         # "monday" (default) | "sunday"
+increment = 1                 # round balance-changing durations to N minutes, nearest/half-up (default 1 = none); must be >= 1
 ```
+
+Rounding (`time::round_to_increment`, nearest/half-up, sign-preserving) is applied in `main.rs` to every delta entering the balance — `add`/`remove`/`set` parsed input and `out` elapsed. `format_duration`/storage are unaffected; rounding happens before the value is written.
 
 ## Documentation
 

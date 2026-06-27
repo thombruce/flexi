@@ -898,6 +898,72 @@ fn out_same_minute_banks_zero() {
     assert!((0..=1).contains(&delta), "delta was {delta}");
 }
 
+// --- increment / rounding tests ---
+
+fn write_config(dir: &Path, toml: &str) {
+    fs::create_dir_all(dir.join("flexi")).unwrap();
+    fs::write(dir.join("flexi").join("flexi.toml"), toml).unwrap();
+}
+
+#[test]
+fn increment_rounds_add_to_nearest() {
+    let dir = tempdir().unwrap();
+    write_config(dir.path(), "increment = 15\n");
+    flexi(&["add", "1", "hr", "7", "min"], dir.path()).success();
+    flexi(&[], dir.path()).success().stdout("1 hr\n");        // 67 → 60
+    flexi(&["add", "8", "min"], dir.path()).success();
+    flexi(&[], dir.path()).success().stdout("1 hr 15 min\n"); // +8 → +15
+}
+
+#[test]
+fn increment_rounds_remove() {
+    let dir = tempdir().unwrap();
+    write_config(dir.path(), "increment = 15\n");
+    flexi(&["add", "1", "hr"], dir.path()).success();
+    flexi(&["remove", "23", "min"], dir.path()).success();    // 23 → 30
+    flexi(&[], dir.path()).success().stdout("30 min\n");
+}
+
+#[test]
+fn increment_rounds_set() {
+    let dir = tempdir().unwrap();
+    write_config(dir.path(), "increment = 15\n");
+    flexi(&["set", "1", "hr", "7", "min"], dir.path()).success();
+    flexi(&[], dir.path()).success().stdout("1 hr\n");        // 67 → 60
+}
+
+#[test]
+fn increment_rounds_clock_out_elapsed() {
+    let dir = tempdir().unwrap();
+    write_config(dir.path(), "increment = 15\n");
+    // 8 minutes elapsed → rounds up to 15
+    let start = (Local::now() - chrono::Duration::minutes(8))
+        .format("%Y-%m-%d %H:%M")
+        .to_string();
+    write_log(dir.path(), &format!("{start} @in 0 min\n"));
+    flexi(&["out"], dir.path()).success();
+    let v = json_out(dir.path(), &[]);
+    let delta = v.as_array().unwrap().last().unwrap()["delta_minutes"]
+        .as_i64()
+        .unwrap();
+    // 8 or 9 raw minutes both round to 15
+    assert_eq!(delta, 15, "delta was {delta}");
+}
+
+#[test]
+fn increment_default_is_one_minute() {
+    let dir = tempdir().unwrap();
+    flexi(&["add", "1", "hr", "7", "min"], dir.path()).success();
+    flexi(&[], dir.path()).success().stdout("1 hr 7 min\n");  // no rounding
+}
+
+#[test]
+fn increment_zero_is_rejected() {
+    let dir = tempdir().unwrap();
+    write_config(dir.path(), "increment = 0\n");
+    flexi(&["add", "1", "hr"], dir.path()).failure();
+}
+
 #[test]
 fn clock_out_full_timestamp_format() {
     let dir = tempdir().unwrap();

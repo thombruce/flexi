@@ -13,6 +13,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `flexi summary` and `flexi prose` — top-level shortcuts for `flexi log --summary` and `flexi log --prose`. Accept the same date filters and default to the whole history.
 - `flexi log --json` — machine-readable output. Prints an array of entries (`timestamp`, `delta_minutes`, `balance_minutes`, `note`), or a totals object when combined with `--summary`. All durations in minutes. Honours date filters; conflicts with `--prose`.
 - `flexi in` / `flexi out` — clock-in/out stopwatch. `in` opens a session (recorded as a balance-neutral `@in <balance>` marker); `out` banks the elapsed time as overtime, recording the worked span as a note. While clocked in, balance-changing commands are blocked, bare `flexi` shows elapsed time, and `flexi undo` cancels the session. Both accept `-m`/`--note`.
+- `increment` config key — rounds every balance-changing duration (`add`, `remove`, `set`, and `in`/`out` elapsed) to the nearest multiple of N minutes (half rounds up). Defaults to `1` (exact minutes). Useful for workplaces that record flexi-time in fixed blocks, e.g. `increment = 15`.
 
 ### Changed
 

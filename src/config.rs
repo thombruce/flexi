@@ -23,12 +23,14 @@ struct RawConfig {
     pub path: Option<PathBuf>,
     pub timestamp_format: Option<TimestampFormat>,
     pub week_start: Option<WeekStart>,
+    pub increment: Option<u32>,
 }
 
 pub struct ResolvedConfig {
     pub path: PathBuf,
     pub timestamp_format: TimestampFormat,
     pub week_start: WeekStart,
+    pub increment: i32,
 }
 
 pub fn resolve() -> Result<ResolvedConfig> {
@@ -41,10 +43,16 @@ pub fn resolve() -> Result<ResolvedConfig> {
         data_dir.join("flexi").join("flexi.txt")
     };
 
+    let increment = raw.increment.unwrap_or(1);
+    if increment < 1 {
+        anyhow::bail!("increment must be at least 1 minute");
+    }
+
     Ok(ResolvedConfig {
         path,
         timestamp_format: raw.timestamp_format.unwrap_or_default(),
         week_start: raw.week_start.unwrap_or_default(),
+        increment: increment as i32,
     })
 }
 
