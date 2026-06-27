@@ -761,3 +761,159 @@ fn json_conflicts_with_prose() {
     let dir = tempdir().unwrap();
     flexi(&["log", "--json", "--prose"], dir.path()).failure();
 }
+
+// --- clock in / out tests ---
+
+#[test]
+fn in_creates_open_marker() {
+    let dir = tempdir().unwrap();
+    flexi(&["add", "2", "hr"], dir.path()).success();
+    flexi(&["in"], dir.path()).success();
+    let log = fs::read_to_string(dir.path().join("flexi").join("flexi.txt")).unwrap();
+    assert!(log.lines().last().unwrap().contains("@in 2 hr"));
+}
+
+#[test]
+fn bare_balance_shows_clocked_in() {
+    let dir = tempdir().unwrap();
+    flexi(&["add", "1", "hr"], dir.path()).success();
+    flexi(&["in"], dir.path()).success();
+    let out = flexi(&[], dir.path()).success().get_output().stdout.clone();
+    let text = String::from_utf8_lossy(&out);
+    assert!(text.contains("clocked in since"));
+}
+
+#[test]
+fn clocked_in_blocks_mutations() {
+    let dir = tempdir().unwrap();
+    flexi(&["in"], dir.path()).success();
+    flexi(&["add", "30", "min"], dir.path()).failure();
+    flexi(&["remove", "30", "min"], dir.path()).failure();
+    flexi(&["set", "1", "hr"], dir.path()).failure();
+    flexi(&["reset"], dir.path()).failure();
+    flexi(&["note", "x"], dir.path()).failure();
+    flexi(&["in"], dir.path()).failure();
+}
+
+#[test]
+fn out_without_in_fails() {
+    let dir = tempdir().unwrap();
+    flexi(&["out"], dir.path()).failure();
+}
+
+#[test]
+fn out_banks_elapsed_time() {
+    let dir = tempdir().unwrap();
+    // Backdate the open marker by 90 minutes (floored to the minute, so the
+    // elapsed computed by `out` is deterministic regardless of seconds).
+    let start = (Local::now() - chrono::Duration::minutes(90))
+        .format("%Y-%m-%d %H:%M")
+        .to_string();
+    write_log(dir.path(), &format!("\
+2026-05-01 09:00 +2 hr > 2 hr\n\
+{start} @in 2 hr # project x\n"));
+    flexi(&["out"], dir.path()).success();
+
+    let v = json_out(dir.path(), &[]);
+    let arr = v.as_array().unwrap();
+    let last = arr.last().unwrap();
+    // 90 or 91 to tolerate a minute rollover between setup and `out`.
+    let delta = last["delta_minutes"].as_i64().unwrap();
+    assert!((90..=91).contains(&delta), "delta was {delta}");
+    let balance = last["balance_minutes"].as_i64().unwrap();
+    assert!((210..=211).contains(&balance), "balance was {balance}");
+    // span + carried in-note recorded
+    let note = last["note"].as_str().unwrap();
+    assert!(note.contains('–') && note.contains("project x"), "note was {note}");
+    // marker consumed, session closed
+    assert_eq!(arr.len(), 2);
+}
+
+#[test]
+fn out_rejects_future_clock_in() {
+    let dir = tempdir().unwrap();
+    let future = (Local::now() + chrono::Duration::hours(1))
+        .format("%Y-%m-%d %H:%M")
+        .to_string();
+    write_log(dir.path(), &format!("{future} @in 0 min\n"));
+    flexi(&["out"], dir.path()).failure();
+}
+
+#[test]
+fn undo_aborts_clock_in() {
+    let dir = tempdir().unwrap();
+    flexi(&["add", "1", "hr"], dir.path()).success();
+    flexi(&["in"], dir.path()).success();
+    flexi(&["undo"], dir.path()).success();
+    // session gone — mutations allowed again, balance intact
+    flexi(&["add", "30", "min"], dir.path()).success();
+    flexi(&[], dir.path()).success().stdout("1 hr 30 min\n");
+}
+
+/// Last entry's `note` field via the JSON output.
+fn last_note(dir: &Path) -> String {
+    let v = json_out(dir, &[]);
+    v.as_array().unwrap().last().unwrap()["note"]
+        .as_str()
+        .unwrap()
+        .to_string()
+}
+
+#[test]
+fn out_merges_in_and_out_notes() {
+    let dir = tempdir().unwrap();
+    let start = (Local::now() - chrono::Duration::minutes(30))
+        .format("%Y-%m-%d %H:%M")
+        .to_string();
+    write_log(dir.path(), &format!("{start} @in 0 min # project x\n"));
+    flexi(&["out", "-m", "wrapped up"], dir.path()).success();
+    let note = last_note(dir.path());
+    assert!(note.contains("project x"), "note was {note}");
+    assert!(note.contains("wrapped up"), "note was {note}");
+}
+
+#[test]
+fn out_note_is_span_only_without_notes() {
+    let dir = tempdir().unwrap();
+    let start = (Local::now() - chrono::Duration::minutes(30))
+        .format("%Y-%m-%d %H:%M")
+        .to_string();
+    write_log(dir.path(), &format!("{start} @in 0 min\n"));
+    flexi(&["out"], dir.path()).success();
+    let note = last_note(dir.path());
+    assert!(note.contains('–'), "note was {note}");      // the worked span
+    assert!(!note.contains(';'), "note was {note}");     // no extra notes appended
+}
+
+#[test]
+fn out_same_minute_banks_zero() {
+    let dir = tempdir().unwrap();
+    let start = Local::now().format("%Y-%m-%d %H:%M").to_string();
+    write_log(dir.path(), &format!("{start} @in 1 hr\n"));
+    flexi(&["out"], dir.path()).success();
+    let v = json_out(dir.path(), &[]);
+    let delta = v.as_array().unwrap().last().unwrap()["delta_minutes"]
+        .as_i64()
+        .unwrap();
+    assert!((0..=1).contains(&delta), "delta was {delta}");
+}
+
+#[test]
+fn clock_out_full_timestamp_format() {
+    let dir = tempdir().unwrap();
+    fs::create_dir_all(dir.path().join("flexi")).unwrap();
+    fs::write(
+        dir.path().join("flexi").join("flexi.toml"),
+        "timestamp_format = \"full\"\n",
+    ).unwrap();
+    // Backdated rfc3339 marker exercises the full-timestamp branch of parse_entry_time.
+    let start = (Local::now() - chrono::Duration::minutes(90))
+        .to_rfc3339_opts(chrono::SecondsFormat::Secs, false);
+    write_log(dir.path(), &format!("{start} @in 1 hr\n"));
+    flexi(&["out"], dir.path()).success();
+    let v = json_out(dir.path(), &[]);
+    let delta = v.as_array().unwrap().last().unwrap()["delta_minutes"]
+        .as_i64()
+        .unwrap();
+    assert!((90..=91).contains(&delta), "delta was {delta}");
+}

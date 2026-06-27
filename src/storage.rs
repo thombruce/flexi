@@ -28,9 +28,17 @@ impl LogEntry {
             parse_duration(&desc[pos + 4..])
         } else if let Some(stripped) = desc.strip_prefix("= ") {
             parse_duration(stripped)
+        } else if let Some(stripped) = desc.strip_prefix("@in ") {
+            parse_duration(stripped)
         } else {
             anyhow::bail!("cannot parse value from log entry: {:?}", self.description)
         }
+    }
+
+    /// True if this entry is an open clock-in marker (`@in <balance>`).
+    pub fn is_clock_in(&self) -> bool {
+        let body = self.description.split(" # ").next().unwrap_or(&self.description);
+        body.starts_with("@in ")
     }
 }
 
@@ -95,6 +103,18 @@ fn parse_log_line(line: &str) -> Result<LogEntry> {
     let desc = rest.trim_start();
     anyhow::ensure!(!desc.is_empty(), "malformed log line: {:?}", line);
     Ok(LogEntry { timestamp: ts.to_string(), description: desc.to_string() })
+}
+
+pub fn last_entry(path: &Path) -> Result<Option<LogEntry>> {
+    if !path.exists() {
+        return Ok(None);
+    }
+    let raw = std::fs::read_to_string(path)
+        .with_context(|| format!("reading {:?}", path))?;
+    match raw.lines().rev().find(|l| !l.is_empty()) {
+        None => Ok(None),
+        Some(line) => Ok(Some(parse_log_line(line)?)),
+    }
 }
 
 pub fn read_minutes(path: &Path) -> Result<i32> {
@@ -175,6 +195,26 @@ mod tests {
     #[test]
     fn new_minutes_bad_description() {
         assert!(entry("bogus description").new_minutes().is_err());
+    }
+
+    #[test]
+    fn new_minutes_clock_in_marker() {
+        assert_eq!(entry("@in 2 hr").new_minutes().unwrap(), 120);
+        assert_eq!(entry("@in 0 min").new_minutes().unwrap(), 0);
+    }
+
+    #[test]
+    fn clock_in_marker_has_no_delta() {
+        assert_eq!(entry("@in 2 hr").delta_minutes(), None);
+    }
+
+    #[test]
+    fn is_clock_in_detection() {
+        assert!(entry("@in 2 hr").is_clock_in());
+        assert!(entry("@in 2 hr # project x").is_clock_in());
+        assert!(!entry("+30 min > 2 hr").is_clock_in());
+        assert!(!entry("= 0 min").is_clock_in());
+        assert!(!entry("+0 min > 2 hr # @in joke note").is_clock_in());
     }
 
     #[test]

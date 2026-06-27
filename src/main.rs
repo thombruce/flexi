@@ -53,6 +53,18 @@ enum Commands {
         #[arg(long, short = 'm', value_parser = parse_note)]
         note: Option<String>,
     },
+    /// Start a clock-in session (time worked is banked on `out`)
+    In {
+        /// Attach a note to this session
+        #[arg(long, short = 'm', value_parser = parse_note)]
+        note: Option<String>,
+    },
+    /// Stop the open clock-in session and bank the elapsed time
+    Out {
+        /// Attach a note to this log entry
+        #[arg(long, short = 'm', value_parser = parse_note)]
+        note: Option<String>,
+    },
     /// Record a note without changing your balance
     Note {
         /// The note text
@@ -238,9 +250,13 @@ fn print_log_entry(entry: &storage::LogEntry) {
         Some((b, n)) => (b.to_string(), Some(n.to_string())),
         None => (entry.description.clone(), None),
     };
-    let body = body
-        .replace(" > ", " → ")
-        .replace(" -> ", " → ");
+    let body = if let Some(bal) = body.strip_prefix("@in ") {
+        format!("clocked in → {}", bal)
+    } else {
+        body
+            .replace(" > ", " → ")
+            .replace(" -> ", " → ")
+    };
     let colored = if body.starts_with('+') {
         body.if_supports_color(Stdout, |t| t.green()).to_string()
     } else if body.starts_with('-') {
@@ -253,6 +269,34 @@ fn print_log_entry(entry: &storage::LogEntry) {
         println!("{}  {}{}", ts, colored, note_str.if_supports_color(Stdout, |t| t.dimmed()));
     } else {
         println!("{}  {}", ts, colored);
+    }
+}
+
+/// Returns the open clock-in entry if a session is currently running.
+fn open_session(cfg: &config::ResolvedConfig) -> Result<Option<storage::LogEntry>> {
+    Ok(storage::last_entry(&cfg.path)?.filter(|e| e.is_clock_in()))
+}
+
+/// Errors if a clock-in session is open (balance mutations must wait for `out`).
+fn ensure_not_clocked_in(cfg: &config::ResolvedConfig) -> Result<()> {
+    if open_session(cfg)?.is_some() {
+        anyhow::bail!("clocked in — run `flexi out` first");
+    }
+    Ok(())
+}
+
+/// Parses a log timestamp (simple or full format) into a local datetime.
+fn parse_entry_time(ts: &str) -> Result<chrono::DateTime<chrono::Local>> {
+    if ts.len() > 10 && ts.as_bytes()[10] == b'T' {
+        Ok(chrono::DateTime::parse_from_rfc3339(ts)
+            .with_context(|| format!("parsing timestamp {:?}", ts))?
+            .with_timezone(&chrono::Local))
+    } else {
+        let naive = chrono::NaiveDateTime::parse_from_str(ts, "%Y-%m-%d %H:%M")
+            .with_context(|| format!("parsing timestamp {:?}", ts))?;
+        naive.and_local_timezone(chrono::Local)
+            .single()
+            .with_context(|| format!("ambiguous local time {:?}", ts))
     }
 }
 
@@ -406,19 +450,43 @@ fn main() -> Result<()> {
     match cli.command {
         None => {
             let mins = storage::read_minutes(&cfg.path)?;
-            print_balance(mins);
+            if let Some(entry) = open_session(&cfg)? {
+                let start = parse_entry_time(&entry.timestamp)?;
+                let elapsed = (chrono::Local::now() - start).num_minutes().max(0) as i32;
+                let bal = {
+                    let f = time::format_duration(mins);
+                    if mins > 0 {
+                        f.if_supports_color(Stdout, |t| t.green()).to_string()
+                    } else if mins < 0 {
+                        f.if_supports_color(Stdout, |t| t.red()).to_string()
+                    } else {
+                        f
+                    }
+                };
+                println!(
+                    "{} (clocked in since {}, {} so far)",
+                    bal,
+                    start.format("%H:%M"),
+                    time::format_duration(elapsed)
+                );
+            } else {
+                print_balance(mins);
+            }
         }
         Some(Commands::Add { time, note }) => {
+            ensure_not_clocked_in(&cfg)?;
             let delta = time::parse_duration(&time.join(" "))?;
             let current = storage::read_minutes(&cfg.path)?;
             record_change(&cfg, current, current + delta, note.as_deref())?;
         }
         Some(Commands::Remove { time, note }) => {
+            ensure_not_clocked_in(&cfg)?;
             let delta = time::parse_duration(&time.join(" "))?;
             let current = storage::read_minutes(&cfg.path)?;
             record_change(&cfg, current, current - delta, note.as_deref())?;
         }
         Some(Commands::Set { time, note }) => {
+            ensure_not_clocked_in(&cfg)?;
             let mins = time::parse_duration(&time.join(" "))?;
             let mut desc = format!("= {}", time::format_duration(mins));
             if let Some(n) = note {
@@ -427,11 +495,46 @@ fn main() -> Result<()> {
             storage::append_log(&cfg.path, &desc, cfg.timestamp_format)?;
             print_balance(mins);
         }
+        Some(Commands::In { note }) => {
+            ensure_not_clocked_in(&cfg)?;
+            let current = storage::read_minutes(&cfg.path)?;
+            let mut desc = format!("@in {}", time::format_duration(current));
+            if let Some(n) = note {
+                desc.push_str(&format!(" # {}", n));
+            }
+            storage::append_log(&cfg.path, &desc, cfg.timestamp_format)?;
+            println!("clocked in at {}", chrono::Local::now().format("%H:%M"));
+        }
+        Some(Commands::Out { note }) => {
+            let entry = open_session(&cfg)?
+                .context("not clocked in — run `flexi in` first")?;
+            let start = parse_entry_time(&entry.timestamp)?;
+            let now = chrono::Local::now();
+            let elapsed = (now - start).num_minutes();
+            if elapsed < 0 {
+                anyhow::bail!("clock-in time is in the future; not banking");
+            }
+            let elapsed = elapsed as i32;
+            let balance = entry.new_minutes()?;
+            storage::pop_log(&cfg.path)?;
+            let span = format!("{}–{}", start.format("%H:%M"), now.format("%H:%M"));
+            let in_note = entry.description.split_once(" # ").map(|(_, n)| n.to_string());
+            // Keep both the clock-in note and any `out -m` note; don't drop either.
+            let extra: Vec<String> = [in_note, note].into_iter().flatten().collect();
+            let full_note = if extra.is_empty() {
+                span
+            } else {
+                format!("{} {}", span, extra.join("; "))
+            };
+            record_change(&cfg, balance, balance + elapsed, Some(&full_note))?;
+        }
         Some(Commands::Note { text }) => {
+            ensure_not_clocked_in(&cfg)?;
             let current = storage::read_minutes(&cfg.path)?;
             record_change(&cfg, current, current, Some(&text))?;
         }
         Some(Commands::Reset { note }) => {
+            ensure_not_clocked_in(&cfg)?;
             let mut desc = "= 0 min".to_string();
             if let Some(n) = note {
                 desc.push_str(&format!(" # {}", n));
