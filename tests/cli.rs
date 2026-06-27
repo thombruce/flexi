@@ -983,3 +983,78 @@ fn clock_out_full_timestamp_format() {
         .unwrap();
     assert!((90..=91).contains(&delta), "delta was {delta}");
 }
+
+// --- max_session safeguard tests ---
+
+fn backdated_in(dir: &Path, minutes: i64) {
+    let start = (Local::now() - chrono::Duration::minutes(minutes))
+        .format("%Y-%m-%d %H:%M")
+        .to_string();
+    write_log(dir, &format!("{start} @in 0 min\n"));
+}
+
+#[test]
+fn out_refuses_over_max_session() {
+    let dir = tempdir().unwrap();
+    write_config(dir.path(), "max_session = 60\n");
+    backdated_in(dir.path(), 90);
+    flexi(&["out"], dir.path()).failure();
+    // session untouched — still open, nothing banked
+    let log = fs::read_to_string(dir.path().join("flexi").join("flexi.txt")).unwrap();
+    assert!(log.lines().last().unwrap().contains("@in"));
+}
+
+#[test]
+fn out_force_banks_over_max_session() {
+    let dir = tempdir().unwrap();
+    write_config(dir.path(), "max_session = 60\n");
+    backdated_in(dir.path(), 90);
+    flexi(&["out", "--force"], dir.path()).success();
+    let v = json_out(dir.path(), &[]);
+    let delta = v.as_array().unwrap().last().unwrap()["delta_minutes"]
+        .as_i64()
+        .unwrap();
+    assert!((90..=91).contains(&delta), "delta was {delta}");
+}
+
+#[test]
+fn out_within_max_session_needs_no_force() {
+    let dir = tempdir().unwrap();
+    write_config(dir.path(), "max_session = 120\n");
+    backdated_in(dir.path(), 30);
+    flexi(&["out"], dir.path()).success();
+}
+
+#[test]
+fn no_max_session_allows_long_session() {
+    let dir = tempdir().unwrap();
+    backdated_in(dir.path(), 600); // 10 hr, no cap configured
+    flexi(&["out"], dir.path()).success();
+}
+
+#[test]
+fn max_session_zero_is_rejected() {
+    let dir = tempdir().unwrap();
+    write_config(dir.path(), "max_session = 0\n");
+    flexi(&[], dir.path()).failure();
+}
+
+#[test]
+fn bare_clocked_in_warns_over_max_session() {
+    let dir = tempdir().unwrap();
+    write_config(dir.path(), "max_session = 60\n");
+    backdated_in(dir.path(), 90);
+    let out = flexi(&[], dir.path()).success().get_output().stdout.clone();
+    let text = String::from_utf8_lossy(&out);
+    assert!(text.contains("over max_session"), "was {text}");
+}
+
+#[test]
+fn bare_clocked_in_rounds_elapsed() {
+    let dir = tempdir().unwrap();
+    write_config(dir.path(), "increment = 15\n");
+    backdated_in(dir.path(), 8); // 8 min → rounds to 15
+    let out = flexi(&[], dir.path()).success().get_output().stdout.clone();
+    let text = String::from_utf8_lossy(&out);
+    assert!(text.contains("15 min so far"), "was {text}");
+}

@@ -24,6 +24,7 @@ struct RawConfig {
     pub timestamp_format: Option<TimestampFormat>,
     pub week_start: Option<WeekStart>,
     pub increment: Option<u32>,
+    pub max_session: Option<u32>,
 }
 
 pub struct ResolvedConfig {
@@ -31,6 +32,7 @@ pub struct ResolvedConfig {
     pub timestamp_format: TimestampFormat,
     pub week_start: WeekStart,
     pub increment: i32,
+    pub max_session: Option<i32>,
 }
 
 pub fn resolve() -> Result<ResolvedConfig> {
@@ -48,11 +50,16 @@ pub fn resolve() -> Result<ResolvedConfig> {
         anyhow::bail!("increment must be at least 1 minute");
     }
 
+    if let Some(0) = raw.max_session {
+        anyhow::bail!("max_session must be at least 1 minute (omit it to disable)");
+    }
+
     Ok(ResolvedConfig {
         path,
         timestamp_format: raw.timestamp_format.unwrap_or_default(),
         week_start: raw.week_start.unwrap_or_default(),
         increment: increment as i32,
+        max_session: raw.max_session.map(|m| m as i32),
     })
 }
 

@@ -64,6 +64,9 @@ enum Commands {
         /// Attach a note to this log entry
         #[arg(long, short = 'm', value_parser = parse_note)]
         note: Option<String>,
+        /// Bank the time even if the session exceeds `max_session`
+        #[arg(long)]
+        force: bool,
     },
     /// Record a note without changing your balance
     Note {
@@ -452,7 +455,8 @@ fn main() -> Result<()> {
             let mins = storage::read_minutes(&cfg.path)?;
             if let Some(entry) = open_session(&cfg)? {
                 let start = parse_entry_time(&entry.timestamp)?;
-                let elapsed = (chrono::Local::now() - start).num_minutes().max(0) as i32;
+                let elapsed_raw = (chrono::Local::now() - start).num_minutes().max(0) as i32;
+                let elapsed = time::round_to_increment(elapsed_raw, cfg.increment);
                 let bal = {
                     let f = time::format_duration(mins);
                     if mins > 0 {
@@ -469,6 +473,10 @@ fn main() -> Result<()> {
                     start.format("%H:%M"),
                     time::format_duration(elapsed)
                 );
+                if cfg.max_session.is_some_and(|cap| elapsed_raw > cap) {
+                    let warn = "⚠ over max_session — clock out with `flexi out --force`";
+                    println!("{}", warn.if_supports_color(Stdout, |t| t.yellow()));
+                }
             } else {
                 print_balance(mins);
             }
@@ -505,7 +513,7 @@ fn main() -> Result<()> {
             storage::append_log(&cfg.path, &desc, cfg.timestamp_format)?;
             println!("clocked in at {}", chrono::Local::now().format("%H:%M"));
         }
-        Some(Commands::Out { note }) => {
+        Some(Commands::Out { note, force }) => {
             let entry = open_session(&cfg)?
                 .context("not clocked in — run `flexi in` first")?;
             let start = parse_entry_time(&entry.timestamp)?;
@@ -514,7 +522,18 @@ fn main() -> Result<()> {
             if elapsed < 0 {
                 anyhow::bail!("clock-in time is in the future; not banking");
             }
-            let elapsed = time::round_to_increment(elapsed as i32, cfg.increment);
+            let elapsed = elapsed as i32;
+            if let Some(cap) = cfg.max_session {
+                if elapsed > cap && !force {
+                    anyhow::bail!(
+                        "session is {} (over max_session of {}) — did you forget to clock out? \
+                         Run `flexi out --force` to bank it anyway.",
+                        time::format_duration(elapsed),
+                        time::format_duration(cap)
+                    );
+                }
+            }
+            let elapsed = time::round_to_increment(elapsed, cfg.increment);
             let balance = entry.new_minutes()?;
             storage::pop_log(&cfg.path)?;
             let span = format!("{}–{}", start.format("%H:%M"), now.format("%H:%M"));

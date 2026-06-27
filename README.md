@@ -40,6 +40,7 @@ flexi add 1 hr --note "reason"  # add time with annotation
 flexi remove 1 hr          # subtract time (alias: rm)
 flexi in                   # start a clock-in session (bank time worked on `out`)
 flexi out                  # stop the session and add the elapsed time
+flexi out --force          # bank the session even if it exceeds max_session
 flexi set 2 hr             # set balance to exact value
 flexi reset                # reset balance to zero
 flexi reset --note "reason"  # reset with annotation
@@ -121,6 +122,7 @@ path = "/path/to/flexi.txt"
 timestamp_format = "simple"  # "simple" (default) or "full"
 week_start = "monday"        # "monday" (default) or "sunday"
 increment = 1                # round durations to this many minutes (default 1 = no rounding)
+max_session = 1440           # warn/refuse if a clock-out session exceeds this many minutes (default: unset)
 ```
 
 | `timestamp_format` | Example |
@@ -134,6 +136,8 @@ increment = 1                # round durations to this many minutes (default 1 =
 | `sunday` | Week starts on Sunday |
 
 `increment` rounds every duration that changes the balance (`add`, `remove`, `set`, and `in`/`out` elapsed) to the nearest multiple of that many minutes — half rounds up. For example, with `increment = 15` a 1 hr 7 min session banks 1 hr and a 1 hr 8 min session banks 1 hr 15 min. The default `1` records exact minutes. Must be at least 1.
+
+`max_session` guards against a forgotten `flexi out`: if an open session is longer than this many minutes, `flexi out` refuses to bank it (run `flexi out --force` to bank it anyway), and bare `flexi` shows a warning while clocked in. It is unset by default (no limit). A generous value like `1440` (24 hours) catches multi-day mistakes without blocking a long workday. Must be at least 1.
 
 Without config, data is stored at `~/.local/share/flexi/flexi.txt` (or the platform equivalent). This file is the change log — the current balance is derived from the last entry.
 
