@@ -1,6 +1,6 @@
 [package]
 name = "flexi"
-version = "0.12.0"
+version = "0.13.0"
 edition = "2021"
 description = "A minimal CLI tool for tracking your flexi-time balance"
 license = "MIT"
