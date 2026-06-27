@@ -75,6 +75,9 @@ enum Commands {
         /// Describe the change in plain sentences
         #[arg(long, conflicts_with = "summary")]
         prose: bool,
+        /// Output as JSON (machine-readable; combine with --summary for totals)
+        #[arg(long, conflicts_with = "prose")]
+        json: bool,
     },
     /// Show totals for a period (shortcut for `log --summary`)
     Summary {
@@ -253,7 +256,7 @@ fn print_log_entry(entry: &storage::LogEntry) {
     }
 }
 
-fn run_log(cfg: &config::ResolvedConfig, filter: &LogFilter, summary: bool, prose: bool) -> Result<()> {
+fn run_log(cfg: &config::ResolvedConfig, filter: &LogFilter, summary: bool, prose: bool, json: bool) -> Result<()> {
     let entries = storage::read_log(&cfg.path)?;
 
     let now = chrono::Local::now().date_naive();
@@ -304,6 +307,37 @@ fn run_log(cfg: &config::ResolvedConfig, filter: &LogFilter, summary: bool, pros
         if n < len {
             filtered = filtered.into_iter().skip(len - n).collect();
         }
+    }
+
+    if json {
+        if summary {
+            let added: i32 = filtered.iter()
+                .filter_map(|e| e.delta_minutes())
+                .filter(|&d| d > 0)
+                .sum();
+            let removed: i32 = filtered.iter()
+                .filter_map(|e| e.delta_minutes())
+                .filter(|&d| d < 0)
+                .sum();
+            let obj = serde_json::json!({
+                "added_minutes": added,
+                "removed_minutes": removed,
+                "net_minutes": added + removed,
+            });
+            println!("{}", serde_json::to_string_pretty(&obj)?);
+        } else {
+            let arr: Vec<_> = filtered.iter().map(|e| {
+                let note = e.description.split_once(" # ").map(|(_, n)| n);
+                serde_json::json!({
+                    "timestamp": e.timestamp,
+                    "delta_minutes": e.delta_minutes(),
+                    "balance_minutes": e.new_minutes().ok(),
+                    "note": note,
+                })
+            }).collect();
+            println!("{}", serde_json::to_string_pretty(&serde_json::Value::Array(arr))?);
+        }
+        return Ok(());
     }
 
     if summary || prose {
@@ -405,14 +439,14 @@ fn main() -> Result<()> {
             storage::append_log(&cfg.path, &desc, cfg.timestamp_format)?;
             print_balance(0);
         }
-        Some(Commands::Log { filter, summary, prose }) => {
-            run_log(&cfg, &filter, summary, prose)?;
+        Some(Commands::Log { filter, summary, prose, json }) => {
+            run_log(&cfg, &filter, summary, prose, json)?;
         }
         Some(Commands::Summary { filter }) => {
-            run_log(&cfg, &filter, true, false)?;
+            run_log(&cfg, &filter, true, false, false)?;
         }
         Some(Commands::Prose { filter }) => {
-            run_log(&cfg, &filter, false, true)?;
+            run_log(&cfg, &filter, false, true, false)?;
         }
         Some(Commands::Edit) => {
             let editor = std::env::var("EDITOR").unwrap_or_else(|_| "vi".to_string());

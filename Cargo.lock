@@ -372,6 +372,7 @@ dependencies = [
  "dirs",
  "owo-colors",
  "serde",
+ "serde_json",
  "tempfile",
  "toml",
 ]

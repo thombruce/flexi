@@ -53,6 +53,7 @@ flexi log --week --summary # totals for current week (added, removed, net)
 flexi log --today --prose  # plain-sentence summary of the period and balance
 flexi summary              # totals (shortcut for `log --summary`; takes the same filters)
 flexi prose                # plain-sentence summary (shortcut for `log --prose`)
+flexi log --json           # machine-readable entries (combine with --summary for totals)
 flexi edit                 # open log file in $EDITOR
 flexi undo                 # undo last change
 flexi copy                 # copy balance to clipboard (alias: cp)
@@ -64,6 +65,8 @@ flexi completions <shell>  # print shell completion script
 `--note`/`-m` works on `add`, `remove`, `set`, and `reset`. Place it before or after the time args.
 
 `flexi summary` and `flexi prose` are shortcuts for `flexi log --summary` and `flexi log --prose`. They accept the same date filters (`--today`, `--week`, `--since`, etc.) and default to the whole history when none is given.
+
+`flexi log --json` emits machine-readable output (honours all date filters). Without `--summary` it prints an array of entries, each with `timestamp`, `delta_minutes` (`null` for `set`/`reset`), `balance_minutes`, and `note` (`null` if none). With `--summary` it prints a totals object `{ "added_minutes", "removed_minutes", "net_minutes" }`. All durations are in minutes. Pipe to `jq` for scripting. (`--json` conflicts with `--prose`.)
 
 Quotes are optional — `flexi add 1h30m` and `flexi add "1h30m"` are equivalent.
 

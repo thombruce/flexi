@@ -695,3 +695,69 @@ fn prose_command_accepts_filter() {
     let line = String::from_utf8_lossy(&out).trim_end().to_string();
     assert_eq!(line, "Today: banked 30 min. Balance now 30 min.");
 }
+
+// --- JSON output tests ---
+
+fn json_out(dir: &Path, args: &[&str]) -> serde_json::Value {
+    let mut full = vec!["log"];
+    full.extend_from_slice(args);
+    full.push("--json");
+    let out = flexi(&full, dir).success().get_output().stdout.clone();
+    serde_json::from_slice(&out).expect("output is valid JSON")
+}
+
+#[test]
+fn json_entries_shape() {
+    let dir = tempdir().unwrap();
+    write_log(dir.path(), "\
+2026-05-01 09:00 +2 hr → 2 hr\n\
+2026-05-02 09:00 -30 min → 1 hr 30 min # lunch\n\
+2026-05-03 09:00 = 1 hr\n");
+    let v = json_out(dir.path(), &[]);
+    let arr = v.as_array().unwrap();
+    assert_eq!(arr.len(), 3);
+
+    assert_eq!(arr[0]["timestamp"], "2026-05-01 09:00");
+    assert_eq!(arr[0]["delta_minutes"], 120);
+    assert_eq!(arr[0]["balance_minutes"], 120);
+    assert!(arr[0]["note"].is_null());
+
+    assert_eq!(arr[1]["delta_minutes"], -30);
+    assert_eq!(arr[1]["balance_minutes"], 90);
+    assert_eq!(arr[1]["note"], "lunch");
+
+    // `set` entries have no delta but carry a balance
+    assert!(arr[2]["delta_minutes"].is_null());
+    assert_eq!(arr[2]["balance_minutes"], 60);
+}
+
+#[test]
+fn json_respects_filter() {
+    let dir = tempdir().unwrap();
+    write_log(dir.path(), "\
+2026-05-01 09:00 +2 hr → 2 hr\n\
+2026-05-10 09:00 +1 hr → 3 hr\n");
+    let v = json_out(dir.path(), &["--since", "2026-05-05"]);
+    let arr = v.as_array().unwrap();
+    assert_eq!(arr.len(), 1);
+    assert_eq!(arr[0]["timestamp"], "2026-05-10 09:00");
+}
+
+#[test]
+fn json_summary_totals() {
+    let dir = tempdir().unwrap();
+    write_log(dir.path(), "\
+2026-05-01 09:00 +2 hr → 2 hr\n\
+2026-05-02 09:00 +1 hr → 3 hr\n\
+2026-05-03 09:00 -30 min → 2 hr 30 min\n");
+    let v = json_out(dir.path(), &["--summary"]);
+    assert_eq!(v["added_minutes"], 180);
+    assert_eq!(v["removed_minutes"], -30);
+    assert_eq!(v["net_minutes"], 150);
+}
+
+#[test]
+fn json_conflicts_with_prose() {
+    let dir = tempdir().unwrap();
+    flexi(&["log", "--json", "--prose"], dir.path()).failure();
+}
