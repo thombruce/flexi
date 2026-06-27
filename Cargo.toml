@@ -18,6 +18,7 @@ chrono = "0.4"
 arboard = "3"
 clap = { version = "4", features = ["derive"] }
 clap_complete = "4"
+clap_mangen = "0.2"
 dirs = "5"
 owo-colors = { version = "4", features = ["supports-colors"] }
 serde = { version = "1", features = ["derive"] }

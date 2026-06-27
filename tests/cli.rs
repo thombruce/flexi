@@ -808,6 +808,16 @@ fn in_note_renders_in_log_and_carries_to_out() {
 }
 
 #[test]
+fn man_outputs_roff() {
+    let dir = tempdir().unwrap();
+    let out = flexi(&["man"], dir.path()).success().get_output().stdout.clone();
+    let text = String::from_utf8_lossy(&out);
+    assert!(text.contains(".TH"), "missing man title header");          // roff TH macro
+    assert!(text.contains("SUBCOMMANDS"), "subcommands not documented");
+    assert!(text.contains("flexi"));
+}
+
+#[test]
 fn note_flag_rejects_empty() {
     let dir = tempdir().unwrap();
     flexi(&["add", "1", "hr", "--note", ""], dir.path()).failure();

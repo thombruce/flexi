@@ -115,6 +115,8 @@ enum Commands {
     Completions {
         shell: Shell,
     },
+    /// Print the man page (roff) to stdout
+    Man,
 }
 
 #[derive(Args)]
@@ -448,6 +450,13 @@ fn main() -> Result<()> {
         return Ok(());
     }
 
+    if let Some(Commands::Man) = cli.command {
+        clap_mangen::Man::new(Cli::command())
+            .render(&mut std::io::stdout())
+            .context("rendering man page")?;
+        return Ok(());
+    }
+
     let cfg = config::resolve()?;
 
     match cli.command {
@@ -593,7 +602,7 @@ fn main() -> Result<()> {
             copy_to_clipboard(&formatted)?;
             print_balance(mins);
         }
-        Some(Commands::Completions { .. }) => unreachable!(),
+        Some(Commands::Completions { .. }) | Some(Commands::Man) => unreachable!(),
     }
 
     Ok(())

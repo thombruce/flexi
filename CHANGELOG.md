@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- `flexi man` — prints a man page (roff) to stdout, e.g. `flexi man > ~/.local/share/man/man1/flexi.1`.
+
 ## [0.13.0] - 2026-06-27
 
 ### Added

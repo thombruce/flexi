@@ -61,6 +61,7 @@ flexi edit                 # open log file in $EDITOR
 flexi undo                 # undo last change
 flexi copy                 # copy balance to clipboard (alias: cp)
 flexi completions <shell>  # print shell completion script
+flexi man                  # print the man page (roff) to stdout
 ```
 
 `add` and `remove` print the change and new balance (e.g. `+1 hr 30 min → 3 hr`). `set` and `reset` print the new balance. `note` records a dated, described entry with a `+0 min` change, leaving the balance untouched (useful for marking leave days, approvals, or reconciliation checkpoints); it is excluded from `--summary` and `--prose` totals. `log` prints one entry per line: `2026-05-24 10:20  +1 hr 30 min → 3 hr`. Notes appear dimmed at the end: `2026-05-24 10:20  +1 hr 30 min → 3 hr  # reason`.
@@ -111,6 +112,12 @@ On **macOS** and **X11 Linux**, no extra dependencies are needed.
 flexi completions zsh > ~/.zsh/completions/_flexi
 flexi completions bash > ~/.bash_completion.d/flexi
 flexi completions fish > ~/.config/fish/completions/flexi.fish
+```
+
+### Man page
+
+```sh
+flexi man > ~/.local/share/man/man1/flexi.1   # then: man flexi
 ```
 
 ## Configuration
