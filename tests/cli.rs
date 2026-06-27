@@ -611,3 +611,36 @@ fn note_on_set() {
     assert!(log.contains("# manual correction"));
     flexi(&[], dir.path()).success().stdout("1 hr\n");
 }
+
+#[test]
+fn note_command_records_without_changing_balance() {
+    let dir = tempdir().unwrap();
+    flexi(&["add", "1", "hr", "30", "min"], dir.path()).success();
+    flexi(&["note", "annual leave"], dir.path())
+        .success()
+        .stdout("+0 min → 1 hr 30 min\n");
+    let log = fs::read_to_string(dir.path().join("flexi").join("flexi.txt")).unwrap();
+    assert!(log.contains("+0 min > 1 hr 30 min # annual leave"));
+    flexi(&[], dir.path()).success().stdout("1 hr 30 min\n");
+}
+
+#[test]
+fn note_command_excluded_from_summary() {
+    let dir = tempdir().unwrap();
+    write_log(dir.path(), "\
+2026-05-01 09:00 +2 hr → 2 hr\n\
+2026-05-02 09:00 +0 min → 2 hr # annual leave\n");
+    let out = flexi(&["log", "--summary"], dir.path()).success().get_output().stdout.clone();
+    let text = String::from_utf8_lossy(&out);
+    let lines: Vec<&str> = text.lines().collect();
+    assert!(lines[0].contains("2 hr"));    // Added: only the +2 hr
+    assert!(lines[1].contains("0 min"));   // Removed: nothing
+    assert!(lines[2].contains("+2 hr"));   // Net: +2 hr, note ignored
+}
+
+#[test]
+fn note_command_rejects_empty() {
+    let dir = tempdir().unwrap();
+    flexi(&["note", ""], dir.path()).failure();
+    flexi(&["note", "   "], dir.path()).failure();
+}

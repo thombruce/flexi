@@ -20,6 +20,9 @@ fn parse_note(s: &str) -> Result<String, String> {
     if s.contains('\n') || s.contains('\r') {
         return Err("note must not contain newlines".to_string());
     }
+    if s.trim().is_empty() {
+        return Err("note must not be empty".to_string());
+    }
     Ok(s.to_string())
 }
 
@@ -49,6 +52,12 @@ enum Commands {
         /// Attach a note to this log entry
         #[arg(long, short = 'm', value_parser = parse_note)]
         note: Option<String>,
+    },
+    /// Record a note without changing your balance
+    Note {
+        /// The note text
+        #[arg(required = true, value_parser = parse_note)]
+        text: String,
     },
     /// Reset your flexi balance to zero
     Reset {
@@ -261,6 +270,10 @@ fn main() -> Result<()> {
             }
             storage::append_log(&cfg.path, &desc, cfg.timestamp_format)?;
             print_balance(mins);
+        }
+        Some(Commands::Note { text }) => {
+            let current = storage::read_minutes(&cfg.path)?;
+            record_change(&cfg, current, current, Some(&text))?;
         }
         Some(Commands::Reset { note }) => {
             let mut desc = "= 0 min".to_string();

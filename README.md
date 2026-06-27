@@ -41,6 +41,7 @@ flexi remove 1 hr          # subtract time (alias: rm)
 flexi set 2 hr             # set balance to exact value
 flexi reset                # reset balance to zero
 flexi reset --note "reason"  # reset with annotation
+flexi note "annual leave"  # record a note without changing the balance
 flexi log                  # show change history
 flexi log --today          # today only (alias: --day)
 flexi log --yesterday      # yesterday only
@@ -56,7 +57,7 @@ flexi copy                 # copy balance to clipboard (alias: cp)
 flexi completions <shell>  # print shell completion script
 ```
 
-`add` and `remove` print the change and new balance (e.g. `+1 hr 30 min → 3 hr`). `set` and `reset` print the new balance. `log` prints one entry per line: `2026-05-24 10:20  +1 hr 30 min → 3 hr`. Notes appear dimmed at the end: `2026-05-24 10:20  +1 hr 30 min → 3 hr  # reason`.
+`add` and `remove` print the change and new balance (e.g. `+1 hr 30 min → 3 hr`). `set` and `reset` print the new balance. `note` records a dated, described entry with a `+0 min` change, leaving the balance untouched (useful for marking leave days, approvals, or reconciliation checkpoints); it is excluded from `--summary` and `--prose` totals. `log` prints one entry per line: `2026-05-24 10:20  +1 hr 30 min → 3 hr`. Notes appear dimmed at the end: `2026-05-24 10:20  +1 hr 30 min → 3 hr  # reason`.
 
 `--note`/`-m` works on `add`, `remove`, `set`, and `reset`. Place it before or after the time args.
 
