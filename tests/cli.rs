@@ -796,6 +796,25 @@ fn clocked_in_blocks_mutations() {
 }
 
 #[test]
+fn in_note_renders_in_log_and_carries_to_out() {
+    let dir = tempdir().unwrap();
+    flexi(&["in", "-m", "deploy"], dir.path()).success();
+    // open marker renders as a clock-in line
+    let lines = log_lines(dir.path(), &[]);
+    assert!(lines.last().unwrap().contains("clocked in"), "was {lines:?}");
+    // the in-note survives through to the banked entry
+    flexi(&["out"], dir.path()).success();
+    assert!(last_note(dir.path()).contains("deploy"));
+}
+
+#[test]
+fn note_flag_rejects_empty() {
+    let dir = tempdir().unwrap();
+    flexi(&["add", "1", "hr", "--note", ""], dir.path()).failure();
+    flexi(&["add", "1", "hr", "-m", "   "], dir.path()).failure();
+}
+
+#[test]
 fn out_without_in_fails() {
     let dir = tempdir().unwrap();
     flexi(&["out"], dir.path()).failure();
