@@ -644,3 +644,54 @@ fn note_command_rejects_empty() {
     flexi(&["note", ""], dir.path()).failure();
     flexi(&["note", "   "], dir.path()).failure();
 }
+
+// --- summary / prose subcommand tests ---
+
+#[test]
+fn summary_command_matches_log_summary() {
+    let dir = tempdir().unwrap();
+    write_log(dir.path(), "\
+2026-05-01 09:00 +2 hr → 2 hr\n\
+2026-05-02 09:00 +1 hr → 3 hr\n\
+2026-05-03 09:00 -30 min → 2 hr 30 min\n");
+    let out = flexi(&["summary"], dir.path()).success().get_output().stdout.clone();
+    let text = String::from_utf8_lossy(&out);
+    let lines: Vec<&str> = text.lines().collect();
+    assert_eq!(lines.len(), 3);
+    assert!(lines[0].contains("3 hr"));         // Added
+    assert!(lines[1].contains("30 min"));        // Removed
+    assert!(lines[2].contains("+2 hr 30 min"));  // Net
+}
+
+#[test]
+fn summary_command_accepts_filter() {
+    let dir = tempdir().unwrap();
+    write_log(dir.path(), "\
+2026-05-01 09:00 +2 hr → 2 hr\n\
+2026-05-10 09:00 +1 hr → 3 hr\n");
+    let out = flexi(&["summary", "--since", "2026-05-05"], dir.path())
+        .success().get_output().stdout.clone();
+    let text = String::from_utf8_lossy(&out);
+    let lines: Vec<&str> = text.lines().collect();
+    assert!(lines[0].contains("1 hr"));   // Added: only May 10
+    assert!(lines[2].contains("+1 hr"));  // Net
+}
+
+#[test]
+fn prose_command_defaults_overall() {
+    let dir = tempdir().unwrap();
+    write_log(dir.path(), "2026-05-15 10:00 +30 min → 30 min\n");
+    let out = flexi(&["prose"], dir.path()).success().get_output().stdout.clone();
+    let line = String::from_utf8_lossy(&out).trim_end().to_string();
+    assert_eq!(line, "Overall: banked 30 min. Balance now 30 min.");
+}
+
+#[test]
+fn prose_command_accepts_filter() {
+    let dir = tempdir().unwrap();
+    let today = Local::now().format("%Y-%m-%d");
+    write_log(dir.path(), &format!("{today} 09:00 +30 min → 30 min\n"));
+    let out = flexi(&["prose", "--today"], dir.path()).success().get_output().stdout.clone();
+    let line = String::from_utf8_lossy(&out).trim_end().to_string();
+    assert_eq!(line, "Today: banked 30 min. Balance now 30 min.");
+}

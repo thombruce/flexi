@@ -5,7 +5,7 @@ mod time;
 use anyhow::{Context, Result};
 use arboard::Clipboard;
 use chrono::Datelike;
-use clap::{CommandFactory, Parser, Subcommand};
+use clap::{Args, CommandFactory, Parser, Subcommand};
 use clap_complete::{generate, Shell};
 use owo_colors::{OwoColorize, Stream::Stdout};
 
@@ -67,33 +67,24 @@ enum Commands {
     },
     /// Show balance change history
     Log {
-        /// Show only the last N entries
-        #[arg(long, short = 'n')]
-        last: Option<usize>,
-        /// Show entries from today only
-        #[arg(long, alias = "day", conflicts_with_all = ["yesterday", "week", "month", "since", "until"])]
-        today: bool,
-        /// Show entries from yesterday only
-        #[arg(long, conflicts_with_all = ["today", "week", "month", "since", "until"])]
-        yesterday: bool,
-        /// Show entries from the current calendar week
-        #[arg(long, conflicts_with_all = ["today", "yesterday", "month", "since", "until"])]
-        week: bool,
-        /// Show entries from the current calendar month
-        #[arg(long, conflicts_with_all = ["today", "yesterday", "week", "since", "until"])]
-        month: bool,
-        /// Show entries on or after this date (YYYY-MM-DD)
-        #[arg(long, conflicts_with_all = ["today", "yesterday", "week", "month"])]
-        since: Option<String>,
-        /// Show entries on or before this date (YYYY-MM-DD)
-        #[arg(long, conflicts_with_all = ["today", "yesterday", "week", "month"])]
-        until: Option<String>,
+        #[command(flatten)]
+        filter: LogFilter,
         /// Show totals instead of individual entries
         #[arg(long)]
         summary: bool,
         /// Describe the change in plain sentences
         #[arg(long, conflicts_with = "summary")]
         prose: bool,
+    },
+    /// Show totals for a period (shortcut for `log --summary`)
+    Summary {
+        #[command(flatten)]
+        filter: LogFilter,
+    },
+    /// Describe a period's change in plain sentences (shortcut for `log --prose`)
+    Prose {
+        #[command(flatten)]
+        filter: LogFilter,
     },
     /// Open the log file in $EDITOR
     Edit,
@@ -106,6 +97,31 @@ enum Commands {
     Completions {
         shell: Shell,
     },
+}
+
+#[derive(Args)]
+struct LogFilter {
+    /// Show only the last N entries
+    #[arg(long, short = 'n')]
+    last: Option<usize>,
+    /// Show entries from today only
+    #[arg(long, alias = "day", conflicts_with_all = ["yesterday", "week", "month", "since", "until"])]
+    today: bool,
+    /// Show entries from yesterday only
+    #[arg(long, conflicts_with_all = ["today", "week", "month", "since", "until"])]
+    yesterday: bool,
+    /// Show entries from the current calendar week
+    #[arg(long, conflicts_with_all = ["today", "yesterday", "month", "since", "until"])]
+    week: bool,
+    /// Show entries from the current calendar month
+    #[arg(long, conflicts_with_all = ["today", "yesterday", "week", "since", "until"])]
+    month: bool,
+    /// Show entries on or after this date (YYYY-MM-DD)
+    #[arg(long, conflicts_with_all = ["today", "yesterday", "week", "month"])]
+    since: Option<String>,
+    /// Show entries on or before this date (YYYY-MM-DD)
+    #[arg(long, conflicts_with_all = ["today", "yesterday", "week", "month"])]
+    until: Option<String>,
 }
 
 fn copy_to_clipboard(text: &str) -> Result<()> {
@@ -237,6 +253,112 @@ fn print_log_entry(entry: &storage::LogEntry) {
     }
 }
 
+fn run_log(cfg: &config::ResolvedConfig, filter: &LogFilter, summary: bool, prose: bool) -> Result<()> {
+    let entries = storage::read_log(&cfg.path)?;
+
+    let now = chrono::Local::now().date_naive();
+    let since_date: Option<chrono::NaiveDate>;
+    let until_date: Option<chrono::NaiveDate>;
+
+    if filter.today {
+        since_date = Some(now);
+        until_date = Some(now);
+    } else if filter.yesterday {
+        let y = now - chrono::Duration::days(1);
+        since_date = Some(y);
+        until_date = Some(y);
+    } else if filter.week {
+        let days_from_start = match cfg.week_start {
+            config::WeekStart::Monday => now.weekday().num_days_from_monday(),
+            config::WeekStart::Sunday => now.weekday().num_days_from_sunday(),
+        };
+        since_date = Some(now - chrono::Duration::days(days_from_start as i64));
+        until_date = Some(now);
+    } else if filter.month {
+        since_date = chrono::NaiveDate::from_ymd_opt(now.year(), now.month(), 1);
+        until_date = Some(now);
+    } else {
+        since_date = filter.since.as_deref()
+            .map(|s| chrono::NaiveDate::parse_from_str(s, "%Y-%m-%d")
+                .context("invalid --since date, expected YYYY-MM-DD"))
+            .transpose()?;
+        until_date = filter.until.as_deref()
+            .map(|s| chrono::NaiveDate::parse_from_str(s, "%Y-%m-%d")
+                .context("invalid --until date, expected YYYY-MM-DD"))
+            .transpose()?;
+    }
+
+    let mut filtered: Vec<_> = entries.into_iter().filter(|e| {
+        let date_str = e.timestamp.get(..10).unwrap_or("");
+        match chrono::NaiveDate::parse_from_str(date_str, "%Y-%m-%d") {
+            Err(_) => true,
+            Ok(d) => {
+                since_date.is_none_or(|s| d >= s)
+                    && until_date.is_none_or(|u| d <= u)
+            }
+        }
+    }).collect();
+
+    if let Some(n) = filter.last {
+        let len = filtered.len();
+        if n < len {
+            filtered = filtered.into_iter().skip(len - n).collect();
+        }
+    }
+
+    if summary || prose {
+        let added: i32 = filtered.iter()
+            .filter_map(|e| e.delta_minutes())
+            .filter(|&d| d > 0)
+            .sum();
+        let removed: i32 = filtered.iter()
+            .filter_map(|e| e.delta_minutes())
+            .filter(|&d| d < 0)
+            .sum();
+        let net = added + removed;
+        if prose {
+            let label = if filter.today {
+                "Today".to_string()
+            } else if filter.yesterday {
+                "Yesterday".to_string()
+            } else if filter.week {
+                "This week".to_string()
+            } else if filter.month {
+                "This month".to_string()
+            } else {
+                match (filter.since.as_deref(), filter.until.as_deref()) {
+                    (Some(s), Some(u)) => format!("Between {} and {}", s, u),
+                    (Some(s), None) => format!("Since {}", s),
+                    (None, Some(u)) => format!("Up to {}", u),
+                    (None, None) => "Overall".to_string(),
+                }
+            };
+            let balance = storage::read_minutes(&cfg.path)?;
+            print_prose(&label, added, removed, balance);
+        } else {
+            let added_str = time::format_duration(added);
+            let removed_str = time::format_duration(removed);
+            let net_sign = if net >= 0 { "+" } else { "" };
+            let net_str = format!("{}{}", net_sign, time::format_duration(net));
+            println!("Added:   {}", added_str.if_supports_color(Stdout, |t| t.green()));
+            println!("Removed: {}", removed_str.if_supports_color(Stdout, |t| t.red()));
+            if net > 0 {
+                println!("Net:     {}", net_str.if_supports_color(Stdout, |t| t.green()));
+            } else if net < 0 {
+                println!("Net:     {}", net_str.if_supports_color(Stdout, |t| t.red()));
+            } else {
+                println!("Net:     {}", net_str);
+            }
+        }
+    } else {
+        for entry in &filtered {
+            print_log_entry(entry);
+        }
+    }
+
+    Ok(())
+}
+
 fn main() -> Result<()> {
     let cli = Cli::parse();
 
@@ -283,108 +405,14 @@ fn main() -> Result<()> {
             storage::append_log(&cfg.path, &desc, cfg.timestamp_format)?;
             print_balance(0);
         }
-        Some(Commands::Log { last, today, yesterday, week, month, since, until, summary, prose }) => {
-            let entries = storage::read_log(&cfg.path)?;
-
-            let now = chrono::Local::now().date_naive();
-            let since_date: Option<chrono::NaiveDate>;
-            let until_date: Option<chrono::NaiveDate>;
-
-            if today {
-                since_date = Some(now);
-                until_date = Some(now);
-            } else if yesterday {
-                let y = now - chrono::Duration::days(1);
-                since_date = Some(y);
-                until_date = Some(y);
-            } else if week {
-                let days_from_start = match cfg.week_start {
-                    config::WeekStart::Monday => now.weekday().num_days_from_monday(),
-                    config::WeekStart::Sunday => now.weekday().num_days_from_sunday(),
-                };
-                since_date = Some(now - chrono::Duration::days(days_from_start as i64));
-                until_date = Some(now);
-            } else if month {
-                since_date = chrono::NaiveDate::from_ymd_opt(now.year(), now.month(), 1);
-                until_date = Some(now);
-            } else {
-                since_date = since.as_deref()
-                    .map(|s| chrono::NaiveDate::parse_from_str(s, "%Y-%m-%d")
-                        .context("invalid --since date, expected YYYY-MM-DD"))
-                    .transpose()?;
-                until_date = until.as_deref()
-                    .map(|s| chrono::NaiveDate::parse_from_str(s, "%Y-%m-%d")
-                        .context("invalid --until date, expected YYYY-MM-DD"))
-                    .transpose()?;
-            }
-
-            let mut filtered: Vec<_> = entries.into_iter().filter(|e| {
-                let date_str = e.timestamp.get(..10).unwrap_or("");
-                match chrono::NaiveDate::parse_from_str(date_str, "%Y-%m-%d") {
-                    Err(_) => true,
-                    Ok(d) => {
-                        since_date.is_none_or(|s| d >= s)
-                            && until_date.is_none_or(|u| d <= u)
-                    }
-                }
-            }).collect();
-
-            if let Some(n) = last {
-                let len = filtered.len();
-                if n < len {
-                    filtered = filtered.into_iter().skip(len - n).collect();
-                }
-            }
-
-            if summary || prose {
-                let added: i32 = filtered.iter()
-                    .filter_map(|e| e.delta_minutes())
-                    .filter(|&d| d > 0)
-                    .sum();
-                let removed: i32 = filtered.iter()
-                    .filter_map(|e| e.delta_minutes())
-                    .filter(|&d| d < 0)
-                    .sum();
-                let net = added + removed;
-                if prose {
-                    let label = if today {
-                        "Today".to_string()
-                    } else if yesterday {
-                        "Yesterday".to_string()
-                    } else if week {
-                        "This week".to_string()
-                    } else if month {
-                        "This month".to_string()
-                    } else {
-                        match (since.as_deref(), until.as_deref()) {
-                            (Some(s), Some(u)) => format!("Between {} and {}", s, u),
-                            (Some(s), None) => format!("Since {}", s),
-                            (None, Some(u)) => format!("Up to {}", u),
-                            (None, None) => "Overall".to_string(),
-                        }
-                    };
-                    let balance = storage::read_minutes(&cfg.path)?;
-                    print_prose(&label, added, removed, balance);
-                } else {
-                    let added_str = time::format_duration(added);
-                    let removed_str = time::format_duration(removed);
-                    let net_sign = if net >= 0 { "+" } else { "" };
-                    let net_str = format!("{}{}", net_sign, time::format_duration(net));
-                    println!("Added:   {}", added_str.if_supports_color(Stdout, |t| t.green()));
-                    println!("Removed: {}", removed_str.if_supports_color(Stdout, |t| t.red()));
-                    if net > 0 {
-                        println!("Net:     {}", net_str.if_supports_color(Stdout, |t| t.green()));
-                    } else if net < 0 {
-                        println!("Net:     {}", net_str.if_supports_color(Stdout, |t| t.red()));
-                    } else {
-                        println!("Net:     {}", net_str);
-                    }
-                }
-            } else {
-                for entry in &filtered {
-                    print_log_entry(entry);
-                }
-            }
+        Some(Commands::Log { filter, summary, prose }) => {
+            run_log(&cfg, &filter, summary, prose)?;
+        }
+        Some(Commands::Summary { filter }) => {
+            run_log(&cfg, &filter, true, false)?;
+        }
+        Some(Commands::Prose { filter }) => {
+            run_log(&cfg, &filter, false, true)?;
         }
         Some(Commands::Edit) => {
             let editor = std::env::var("EDITOR").unwrap_or_else(|_| "vi".to_string());

@@ -51,6 +51,8 @@ flexi log --since 2026-05-01 --until 2026-05-24  # date range
 flexi log --last 10        # last 10 entries (combinable with filters)
 flexi log --week --summary # totals for current week (added, removed, net)
 flexi log --today --prose  # plain-sentence summary of the period and balance
+flexi summary              # totals (shortcut for `log --summary`; takes the same filters)
+flexi prose                # plain-sentence summary (shortcut for `log --prose`)
 flexi edit                 # open log file in $EDITOR
 flexi undo                 # undo last change
 flexi copy                 # copy balance to clipboard (alias: cp)
@@ -60,6 +62,8 @@ flexi completions <shell>  # print shell completion script
 `add` and `remove` print the change and new balance (e.g. `+1 hr 30 min → 3 hr`). `set` and `reset` print the new balance. `note` records a dated, described entry with a `+0 min` change, leaving the balance untouched (useful for marking leave days, approvals, or reconciliation checkpoints); it is excluded from `--summary` and `--prose` totals. `log` prints one entry per line: `2026-05-24 10:20  +1 hr 30 min → 3 hr`. Notes appear dimmed at the end: `2026-05-24 10:20  +1 hr 30 min → 3 hr  # reason`.
 
 `--note`/`-m` works on `add`, `remove`, `set`, and `reset`. Place it before or after the time args.
+
+`flexi summary` and `flexi prose` are shortcuts for `flexi log --summary` and `flexi log --prose`. They accept the same date filters (`--today`, `--week`, `--since`, etc.) and default to the whole history when none is given.
 
 Quotes are optional — `flexi add 1h30m` and `flexi add "1h30m"` are equivalent.
 

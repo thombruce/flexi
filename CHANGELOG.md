@@ -10,6 +10,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 
 - `flexi note "<text>"` — records a dated, described log entry with a `+0 min` change, leaving the balance untouched. Useful for marking leave days, approvals, or reconciliation checkpoints. Excluded from `--summary` and `--prose` totals.
+- `flexi summary` and `flexi prose` — top-level shortcuts for `flexi log --summary` and `flexi log --prose`. Accept the same date filters and default to the whole history.
 
 ### Changed
 
