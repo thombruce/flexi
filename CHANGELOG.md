@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.15.0] - 2026-06-30
+
 ### Added
 
 - `flexi away`/`flexi back` — a spending session that mirrors `in`/`out`: start it when you step out (long lunch, appointment), end it when you return, and the elapsed time is *subtracted* from your balance. Supports notes, span recording, `max_session`, `--force`, and `flexi undo`. `flexi out` and `flexi back` are interchangeable closers (only one session is open at a time; the sign is set when the session opens).
