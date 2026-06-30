@@ -796,6 +796,16 @@ fn clocked_in_blocks_mutations() {
 }
 
 #[test]
+fn away_blocks_mutations() {
+    let dir = tempdir().unwrap();
+    flexi(&["away"], dir.path()).success();
+    flexi(&["add", "30", "min"], dir.path()).failure();
+    flexi(&["set", "1", "hr"], dir.path()).failure();
+    flexi(&["away"], dir.path()).failure();
+    flexi(&["in"], dir.path()).failure();
+}
+
+#[test]
 fn in_note_renders_in_log_and_carries_to_out() {
     let dir = tempdir().unwrap();
     flexi(&["in", "-m", "deploy"], dir.path()).success();
@@ -856,6 +866,61 @@ fn out_banks_elapsed_time() {
     assert!(note.contains('–') && note.contains("project x"), "note was {note}");
     // marker consumed, session closed
     assert_eq!(arr.len(), 2);
+}
+
+#[test]
+fn away_creates_spend_marker() {
+    let dir = tempdir().unwrap();
+    flexi(&["add", "2", "hr"], dir.path()).success();
+    flexi(&["away"], dir.path()).success();
+    let log = fs::read_to_string(dir.path().join("flexi").join("flexi.txt")).unwrap();
+    assert!(log.lines().last().unwrap().contains("@out 2 hr"));
+}
+
+#[test]
+fn bare_balance_shows_away() {
+    let dir = tempdir().unwrap();
+    flexi(&["add", "2", "hr"], dir.path()).success();
+    flexi(&["away"], dir.path()).success();
+    let text = String::from_utf8(flexi(&[], dir.path()).get_output().stdout.clone()).unwrap();
+    assert!(text.contains("away since"));
+}
+
+#[test]
+fn back_deducts_elapsed_time() {
+    let dir = tempdir().unwrap();
+    let start = (Local::now() - chrono::Duration::minutes(90))
+        .format("%Y-%m-%d %H:%M")
+        .to_string();
+    write_log(dir.path(), &format!("\
+2026-05-01 09:00 +5 hr > 5 hr\n\
+{start} @out 5 hr # dentist\n"));
+    flexi(&["back"], dir.path()).success();
+
+    let v = json_out(dir.path(), &[]);
+    let arr = v.as_array().unwrap();
+    let last = arr.last().unwrap();
+    let delta = last["delta_minutes"].as_i64().unwrap();
+    assert!((-91..=-90).contains(&delta), "delta was {delta}");
+    let balance = last["balance_minutes"].as_i64().unwrap();
+    assert!((209..=210).contains(&balance), "balance was {balance}");
+    let note = last["note"].as_str().unwrap();
+    assert!(note.contains('–') && note.contains("dentist"), "note was {note}");
+    assert_eq!(arr.len(), 2);
+}
+
+#[test]
+fn out_closes_away_session() {
+    // `out` is a forgiving alias for `back`: closes whichever session is open.
+    let dir = tempdir().unwrap();
+    let start = (Local::now() - chrono::Duration::minutes(30))
+        .format("%Y-%m-%d %H:%M")
+        .to_string();
+    write_log(dir.path(), &format!("{start} @out 5 hr\n"));
+    flexi(&["out"], dir.path()).success();
+    let delta = json_out(dir.path(), &[]).as_array().unwrap().last().unwrap()
+        ["delta_minutes"].as_i64().unwrap();
+    assert!(delta < 0, "spend should deduct, delta was {delta}");
 }
 
 #[test]

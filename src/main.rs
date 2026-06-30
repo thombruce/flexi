@@ -59,12 +59,19 @@ enum Commands {
         #[arg(long, short = 'm', value_parser = parse_note)]
         note: Option<String>,
     },
-    /// Stop the open clock-in session and bank the elapsed time
+    /// Start a spending session (time away is deducted on `back`)
+    Away {
+        /// Attach a note to this session
+        #[arg(long, short = 'm', value_parser = parse_note)]
+        note: Option<String>,
+    },
+    /// Close the open session: bank (`in`) or deduct (`away`) the elapsed time
+    #[command(alias = "back")]
     Out {
         /// Attach a note to this log entry
         #[arg(long, short = 'm', value_parser = parse_note)]
         note: Option<String>,
-        /// Bank the time even if the session exceeds `max_session`
+        /// Apply the time even if the session exceeds `max_session`
         #[arg(long)]
         force: bool,
     },
@@ -257,6 +264,8 @@ fn print_log_entry(entry: &storage::LogEntry) {
     };
     let body = if let Some(bal) = body.strip_prefix("@in ") {
         format!("clocked in → {}", bal)
+    } else if let Some(bal) = body.strip_prefix("@out ") {
+        format!("stepped away → {}", bal)
     } else {
         body
             .replace(" > ", " → ")
@@ -277,15 +286,15 @@ fn print_log_entry(entry: &storage::LogEntry) {
     }
 }
 
-/// Returns the open clock-in entry if a session is currently running.
+/// Returns the open session marker (`@in`/`@out`) if one is currently running.
 fn open_session(cfg: &config::ResolvedConfig) -> Result<Option<storage::LogEntry>> {
-    Ok(storage::last_entry(&cfg.path)?.filter(|e| e.is_clock_in()))
+    Ok(storage::last_entry(&cfg.path)?.filter(|e| e.is_open_marker()))
 }
 
-/// Errors if a clock-in session is open (balance mutations must wait for `out`).
+/// Errors if a session is open (balance mutations must wait for `out`).
 fn ensure_not_clocked_in(cfg: &config::ResolvedConfig) -> Result<()> {
     if open_session(cfg)?.is_some() {
-        anyhow::bail!("clocked in — run `flexi out` first");
+        anyhow::bail!("a session is open — run `flexi out` first");
     }
     Ok(())
 }
@@ -476,14 +485,20 @@ fn main() -> Result<()> {
                         f
                     }
                 };
+                let (label, verb) = if entry.is_spend() {
+                    ("away since", "back")
+                } else {
+                    ("clocked in since", "out")
+                };
                 println!(
-                    "{} (clocked in since {}, {} so far)",
+                    "{} ({} {}, {} so far)",
                     bal,
+                    label,
                     start.format("%H:%M"),
                     time::format_duration(elapsed)
                 );
                 if cfg.max_session.is_some_and(|cap| elapsed_raw > cap) {
-                    let warn = "⚠ over max_session — clock out with `flexi out --force`";
+                    let warn = format!("⚠ over max_session — close with `flexi {} --force`", verb);
                     println!("{}", warn.if_supports_color(Stdout, |t| t.yellow()));
                 }
             } else {
@@ -522,39 +537,53 @@ fn main() -> Result<()> {
             storage::append_log(&cfg.path, &desc, cfg.timestamp_format)?;
             println!("clocked in at {}", chrono::Local::now().format("%H:%M"));
         }
+        Some(Commands::Away { note }) => {
+            ensure_not_clocked_in(&cfg)?;
+            let current = storage::read_minutes(&cfg.path)?;
+            let mut desc = format!("@out {}", time::format_duration(current));
+            if let Some(n) = note {
+                desc.push_str(&format!(" # {}", n));
+            }
+            storage::append_log(&cfg.path, &desc, cfg.timestamp_format)?;
+            println!("stepped away at {}", chrono::Local::now().format("%H:%M"));
+        }
         Some(Commands::Out { note, force }) => {
             let entry = open_session(&cfg)?
-                .context("not clocked in — run `flexi in` first")?;
+                .context("no open session — run `flexi in` or `flexi away` first")?;
+            let spend = entry.is_spend();
             let start = parse_entry_time(&entry.timestamp)?;
             let now = chrono::Local::now();
             let elapsed = (now - start).num_minutes();
             if elapsed < 0 {
-                anyhow::bail!("clock-in time is in the future; not banking");
+                anyhow::bail!("session start time is in the future; not recording");
             }
             let elapsed = elapsed as i32;
             if let Some(cap) = cfg.max_session {
                 if elapsed > cap && !force {
+                    let verb = if spend { "back" } else { "out" };
                     anyhow::bail!(
-                        "session is {} (over max_session of {}) — did you forget to clock out? \
-                         Run `flexi out --force` to bank it anyway.",
+                        "session is {} (over max_session of {}) — did you forget to close it? \
+                         Run `flexi {} --force` to record it anyway.",
                         time::format_duration(elapsed),
-                        time::format_duration(cap)
+                        time::format_duration(cap),
+                        verb
                     );
                 }
             }
             let elapsed = time::round_to_increment(elapsed, cfg.increment);
+            let delta = if spend { -elapsed } else { elapsed };
             let balance = entry.new_minutes()?;
             storage::pop_log(&cfg.path)?;
             let span = format!("{}–{}", start.format("%H:%M"), now.format("%H:%M"));
-            let in_note = entry.description.split_once(" # ").map(|(_, n)| n.to_string());
-            // Keep both the clock-in note and any `out -m` note; don't drop either.
-            let extra: Vec<String> = [in_note, note].into_iter().flatten().collect();
+            let open_note = entry.description.split_once(" # ").map(|(_, n)| n.to_string());
+            // Keep both the session-open note and any closing `-m` note; don't drop either.
+            let extra: Vec<String> = [open_note, note].into_iter().flatten().collect();
             let full_note = if extra.is_empty() {
                 span
             } else {
                 format!("{} {}", span, extra.join("; "))
             };
-            record_change(&cfg, balance, balance + elapsed, Some(&full_note))?;
+            record_change(&cfg, balance, balance + delta, Some(&full_note))?;
         }
         Some(Commands::Note { text }) => {
             ensure_not_clocked_in(&cfg)?;

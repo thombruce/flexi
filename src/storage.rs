@@ -30,15 +30,26 @@ impl LogEntry {
             parse_duration(stripped)
         } else if let Some(stripped) = desc.strip_prefix("@in ") {
             parse_duration(stripped)
+        } else if let Some(stripped) = desc.strip_prefix("@out ") {
+            parse_duration(stripped)
         } else {
             anyhow::bail!("cannot parse value from log entry: {:?}", self.description)
         }
     }
 
-    /// True if this entry is an open clock-in marker (`@in <balance>`).
-    pub fn is_clock_in(&self) -> bool {
-        let body = self.description.split(" # ").next().unwrap_or(&self.description);
-        body.starts_with("@in ")
+    fn marker_body(&self) -> &str {
+        self.description.split(" # ").next().unwrap_or(&self.description)
+    }
+
+    /// True if this entry is an open session marker (`@in`/`@out <balance>`).
+    pub fn is_open_marker(&self) -> bool {
+        let b = self.marker_body();
+        b.starts_with("@in ") || b.starts_with("@out ")
+    }
+
+    /// True if the open marker is a spending session (`@out <balance>`).
+    pub fn is_spend(&self) -> bool {
+        self.marker_body().starts_with("@out ")
     }
 }
 
@@ -198,23 +209,34 @@ mod tests {
     }
 
     #[test]
-    fn new_minutes_clock_in_marker() {
+    fn new_minutes_session_markers() {
         assert_eq!(entry("@in 2 hr").new_minutes().unwrap(), 120);
         assert_eq!(entry("@in 0 min").new_minutes().unwrap(), 0);
+        assert_eq!(entry("@out 2 hr").new_minutes().unwrap(), 120);
     }
 
     #[test]
-    fn clock_in_marker_has_no_delta() {
+    fn session_markers_have_no_delta() {
         assert_eq!(entry("@in 2 hr").delta_minutes(), None);
+        assert_eq!(entry("@out 2 hr").delta_minutes(), None);
     }
 
     #[test]
-    fn is_clock_in_detection() {
-        assert!(entry("@in 2 hr").is_clock_in());
-        assert!(entry("@in 2 hr # project x").is_clock_in());
-        assert!(!entry("+30 min > 2 hr").is_clock_in());
-        assert!(!entry("= 0 min").is_clock_in());
-        assert!(!entry("+0 min > 2 hr # @in joke note").is_clock_in());
+    fn open_marker_detection() {
+        assert!(entry("@in 2 hr").is_open_marker());
+        assert!(entry("@in 2 hr # project x").is_open_marker());
+        assert!(entry("@out 30 min").is_open_marker());
+        assert!(!entry("+30 min > 2 hr").is_open_marker());
+        assert!(!entry("= 0 min").is_open_marker());
+        assert!(!entry("+0 min > 2 hr # @in joke note").is_open_marker());
+    }
+
+    #[test]
+    fn spend_detection() {
+        assert!(entry("@out 30 min").is_spend());
+        assert!(entry("@out 30 min # dentist").is_spend());
+        assert!(!entry("@in 2 hr").is_spend());
+        assert!(!entry("-30 min > 1 hr").is_spend());
     }
 
     #[test]
