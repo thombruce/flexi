@@ -1,0 +1,162 @@
+use assert_cmd::Command;
+use chrono::{Datelike, Duration, Local, NaiveDate};
+use std::fs;
+use std::path::Path;
+use tempfile::tempdir;
+
+fn calchemy(args: &[&str], dir: &Path) -> assert_cmd::assert::Assert {
+    Command::cargo_bin("calchemy")
+        .unwrap()
+        .env("XDG_DATA_HOME", dir)
+        .env("XDG_CONFIG_HOME", dir)
+        .args(args)
+        .assert()
+}
+
+fn write_log(dir: &Path, content: &str) {
+    fs::create_dir_all(dir.join("calchemy")).unwrap();
+    fs::write(dir.join("calchemy").join("calchemy.txt"), content).unwrap();
+}
+
+fn read_log(dir: &Path) -> String {
+    fs::read_to_string(dir.join("calchemy").join("calchemy.txt")).unwrap()
+}
+
+fn out(assert: assert_cmd::assert::Assert) -> String {
+    String::from_utf8_lossy(&assert.success().get_output().stdout).to_string()
+}
+
+fn day(offset: i64) -> String {
+    (Local::now().date_naive() + Duration::days(offset)).format("%Y-%m-%d").to_string()
+}
+
+#[test]
+fn add_writes_canonical_lines() {
+    let dir = tempdir().unwrap();
+    calchemy(&["add", "2026-12-25", "Christmas"], dir.path()).success();
+    calchemy(&["add", "2026-07-14", "09:00", "Team", "sync"], dir.path()).success();
+    calchemy(&["add", "2026-07-14", "09:00-10:00", "Dentist", "@clinic"], dir.path()).success();
+    calchemy(&["add", "2026-07-14", "20:00-02:00", "Party"], dir.path()).success();
+    let log = read_log(dir.path());
+    assert!(log.contains("2026-12-25 # Christmas"), "{log}");
+    assert!(log.contains("2026-07-14 09:00 # Team sync"), "{log}");
+    assert!(log.contains("2026-07-14 09:00 10:00 # Dentist @clinic"), "{log}");
+    assert!(log.contains("2026-07-14 20:00 2026-07-15 02:00 # Party"), "cross-day end: {log}");
+}
+
+#[test]
+fn add_requires_title() {
+    let dir = tempdir().unwrap();
+    calchemy(&["add", "2026-07-14", "09:00"], dir.path())
+        .failure()
+        .stderr(predicates::str::contains("needs a title"));
+}
+
+#[test]
+fn bare_shows_today_agenda() {
+    let dir = tempdir().unwrap();
+    write_log(
+        dir.path(),
+        &format!("{} 14:00 # Team sync\n{} 09:00 # Standup\n{} # Future thing\n", day(0), day(0), day(3)),
+    );
+    let o = out(calchemy(&[], dir.path()));
+    assert!(o.contains("(today)"), "{o}");
+    // Sorted by time, and only today's events.
+    let standup = o.find("Standup").unwrap();
+    let sync = o.find("Team sync").unwrap();
+    assert!(standup < sync, "09:00 should precede 14:00: {o}");
+    assert!(!o.contains("Future thing"), "only today: {o}");
+}
+
+#[test]
+fn list_default_hides_past() {
+    let dir = tempdir().unwrap();
+    write_log(dir.path(), &format!("{} # Past\n{} # Future\n", day(-5), day(2)));
+    let o = out(calchemy(&["list"], dir.path()));
+    assert!(o.contains("Future"), "{o}");
+    assert!(!o.contains("Past"), "default list is upcoming only: {o}");
+}
+
+#[test]
+fn list_all_and_past_views() {
+    let dir = tempdir().unwrap();
+    write_log(dir.path(), &format!("{} # Past\n{} # Future\n", day(-5), day(2)));
+    let all = out(calchemy(&["list", "--all"], dir.path()));
+    assert!(all.contains("Past") && all.contains("Future"), "{all}");
+    let past = out(calchemy(&["list", "--past"], dir.path()));
+    assert!(past.contains("Past") && !past.contains("Future"), "{past}");
+}
+
+#[test]
+fn next_picks_soonest_upcoming() {
+    let dir = tempdir().unwrap();
+    // Both timed and future-dated, so independent of the current clock.
+    write_log(dir.path(), &format!("{} 09:00 # Later\n{} 09:00 # Sooner\n", day(3), day(1)));
+    let o = out(calchemy(&["next"], dir.path()));
+    assert!(o.contains("Sooner"), "{o}");
+    assert!(!o.contains("Later"), "{o}");
+}
+
+#[test]
+fn week_filter_is_full_week() {
+    let dir = tempdir().unwrap();
+    // today is always in this week; today+8 never is.
+    write_log(dir.path(), &format!("{} # ThisWeek\n{} # NextWeek\n", day(0), day(8)));
+    let o = out(calchemy(&["week"], dir.path()));
+    assert!(o.contains("ThisWeek"), "{o}");
+    assert!(!o.contains("NextWeek"), "week is bounded: {o}");
+}
+
+#[test]
+fn month_filter_is_full_month() {
+    let dir = tempdir().unwrap();
+    let today = Local::now().date_naive();
+    let first = NaiveDate::from_ymd_opt(today.year(), today.month(), 1)
+        .unwrap()
+        .format("%Y-%m-%d")
+        .to_string();
+    write_log(dir.path(), &format!("{first} # ThisMonth\n{} # NextMonthish\n", day(40)));
+    let o = out(calchemy(&["list", "--month"], dir.path()));
+    assert!(o.contains("ThisMonth"), "{o}");
+    assert!(!o.contains("NextMonthish"), "month is bounded: {o}");
+}
+
+#[test]
+fn rm_by_index_removes_and_preserves_order() {
+    let dir = tempdir().unwrap();
+    write_log(
+        dir.path(),
+        &format!("{} 09:00 # First\n{} 10:00 # Second\n{} 11:00 # Third\n", day(1), day(1), day(1)),
+    );
+    let o = out(calchemy(&["rm", "2"], dir.path()));
+    assert!(o.contains("removed:") && o.contains("Second"), "{o}");
+    let log = read_log(dir.path());
+    assert!(log.contains("First") && log.contains("Third"), "{log}");
+    assert!(!log.contains("Second"), "{log}");
+    // Original file order preserved.
+    assert!(log.find("First").unwrap() < log.find("Third").unwrap(), "{log}");
+}
+
+#[test]
+fn rm_bad_index_errors() {
+    let dir = tempdir().unwrap();
+    write_log(dir.path(), &format!("{} 09:00 # Only\n", day(1)));
+    calchemy(&["rm", "5"], dir.path())
+        .failure()
+        .stderr(predicates::str::contains("no appointment 5"));
+}
+
+#[test]
+fn empty_states() {
+    let dir = tempdir().unwrap();
+    calchemy(&[], dir.path()).success().stdout("no appointments today\n");
+    calchemy(&["next"], dir.path()).success().stdout("no upcoming appointments\n");
+    calchemy(&["list"], dir.path()).success().stdout("no appointments\n");
+}
+
+#[test]
+fn completions_and_man_smoke() {
+    let dir = tempdir().unwrap();
+    assert!(out(calchemy(&["completions", "bash"], dir.path())).contains("calchemy"));
+    assert!(out(calchemy(&["man"], dir.path())).contains("calchemy"));
+}

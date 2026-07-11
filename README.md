@@ -9,6 +9,7 @@ inspired by [todo.txt](https://github.com/todotxt/todo.txt).
 |-------|-------------|
 | [`flexi`](crates/flexi/) | Track your flexi-time balance. |
 | [`clocking`](crates/clocking/) | Log your working hours (clock in / clock out). |
+| [`calchemy`](crates/calchemy/) | A plaintext calendar / appointment book. |
 
 ## Development
 
