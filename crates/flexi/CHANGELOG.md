@@ -7,9 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.15.1] - 2026-07-11
+
 ### Changed
 
-- Release tags are now per-crate: flexi releases from a `flexi-vX.Y.Z` tag (e.g. `flexi-v0.16.0`), not the old `vX.Y.Z`. The repository is a Cargo workspace and a single generic workflow releases each crate from its own `<crate>-vX.Y.Z` tag. Existing `vX.Y.Z` tags and their releases are unaffected.
+- Release tags are now per-crate: flexi releases from a `flexi-vX.Y.Z` tag (e.g. `flexi-v0.15.1`), not the old `vX.Y.Z`. The repository is a Cargo workspace and a single generic workflow releases each crate from its own `<crate>-vX.Y.Z` tag. Existing `vX.Y.Z` tags and their releases are unaffected.
 
 ## [0.15.0] - 2026-06-30
 
