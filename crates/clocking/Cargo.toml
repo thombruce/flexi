@@ -1,0 +1,29 @@
+[package]
+name = "clocking"
+version = "0.1.0"
+edition = "2021"
+description = "A minimal CLI tool for logging your working hours"
+license = "MIT"
+repository = "https://github.com/thombruce/flexi"
+keywords = ["clocking", "time", "cli", "productivity", "timesheet"]
+categories = ["command-line-utilities"]
+
+[[bin]]
+name = "clocking"
+path = "src/main.rs"
+
+[dependencies]
+anyhow = "1"
+chrono = "0.4"
+clap = { version = "4", features = ["derive"] }
+clap_complete = "4"
+clap_mangen = "0.2"
+dirs = "5"
+owo-colors = { version = "4", features = ["supports-colors"] }
+serde = { version = "1", features = ["derive"] }
+toml = "0.8"
+
+[dev-dependencies]
+assert_cmd = "2"
+predicates = "3"
+tempfile = "3"

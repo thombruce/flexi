@@ -4,9 +4,14 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Workspace layout
 
-Cargo workspace (`Cargo.toml` at root, `members = ["crates/*"]`). Each tool is its own crate under `crates/`. Currently one member: `crates/flexi`. Sibling tools (e.g. `clocking`, a calendar) will be added as further crates; shared code is only extracted into a common crate once a second tool concretely repeats it — not speculatively.
+Cargo workspace (`Cargo.toml` at root, `members = ["crates/*"]`). Each tool is its own crate under `crates/`:
 
-The rest of this file describes the `flexi` crate (`crates/flexi/`).
+- `crates/flexi` — track a running flexi-time balance.
+- `crates/clocking` — log working hours as discrete clock-in/clock-out sessions.
+
+Both share the same plaintext-log approach. `time.rs` (duration parse/format/round) is copied verbatim between them, and `config.rs` is copied with the crate name swapped. This duplication is **deliberate**: rule of three — a shared crate is extracted only once a third tool repeats the same code, not before. `storage.rs` is *not* shared: flexi keeps a running-balance chain (tail = current state via `new_minutes()`), while clocking records independent session durations summed over a period (`session_minutes()`), so the two storage layers diverge in semantics despite sharing the atomic-write/timestamp plumbing.
+
+The rest of this file describes the `flexi` crate (`crates/flexi/`). The `clocking` crate mirrors flexi's module layout (`main.rs` + `config.rs` + `storage.rs` + `time.rs`, clap CLI, `@in` open-marker session model) with a leaner command set: `in`/`out`, `log`/`summary` (with the same date filters), `edit`, `undo`, `completions`, `man`. It has no balance, so no `add`/`remove`/`set`/`reset`, no clipboard, no json/prose. Its `out` pops the `@in` marker and appends `<duration> (HH:MM–HH:MM)`; `summary` sums those durations. Release wiring (workflow, homebrew, tag prefix) is flexi-only for now — see Releases.
 
 ## Commands
 

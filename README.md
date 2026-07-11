@@ -8,6 +8,7 @@ inspired by [todo.txt](https://github.com/todotxt/todo.txt).
 | Crate | Description |
 |-------|-------------|
 | [`flexi`](crates/flexi/) | Track your flexi-time balance. |
+| [`clocking`](crates/clocking/) | Log your working hours (clock in / clock out). |
 
 ## Development
 
