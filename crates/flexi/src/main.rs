@@ -54,6 +54,7 @@ enum Commands {
         note: Option<String>,
     },
     /// Start a clock-in session (time worked is banked on `out`)
+    #[command(visible_alias = "start")]
     In {
         /// Attach a note to this session
         #[arg(long, short = 'm', value_parser = parse_note)]
@@ -66,7 +67,7 @@ enum Commands {
         note: Option<String>,
     },
     /// Close the open session: bank (`in`) or deduct (`away`) the elapsed time
-    #[command(alias = "back")]
+    #[command(alias = "back", visible_alias = "stop")]
     Out {
         /// Attach a note to this log entry
         #[arg(long, short = 'm', value_parser = parse_note)]
