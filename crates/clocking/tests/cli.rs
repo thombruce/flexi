@@ -32,6 +32,12 @@ fn open_marker_ago(mins: i64) -> String {
     format!("{} @in\n", start.format("%Y-%m-%d %H:%M"))
 }
 
+/// A `@in` marker `mins` minutes ago in the RFC 3339 "full" timestamp format.
+fn open_marker_ago_full(mins: i64) -> String {
+    let start = Local::now() - Duration::minutes(mins);
+    format!("{} @in\n", start.to_rfc3339_opts(chrono::SecondsFormat::Secs, false))
+}
+
 #[test]
 fn fresh_status_is_not_clocked_in() {
     let dir = tempdir().unwrap();
@@ -132,6 +138,60 @@ fn log_today_filters_by_date() {
     let out = stdout(clocking(&["log", "--today"], dir.path()));
     assert!(out.contains("6 hr"), "got: {out}");
     assert!(!out.contains("8 hr"), "old entry should be filtered: {out}");
+}
+
+#[test]
+fn full_timestamp_format_records_and_reads() {
+    let dir = tempdir().unwrap();
+    fs::create_dir_all(dir.path().join("clocking")).unwrap();
+    fs::write(dir.path().join("clocking").join("clocking.toml"), "timestamp_format = \"full\"\n").unwrap();
+    // Seed an open marker with a full (25-char, T-separated) timestamp.
+    write_log(dir.path(), &open_marker_ago_full(90));
+    // Status must parse the full timestamp back.
+    let status = stdout(clocking(&[], dir.path()));
+    assert!(status.contains("clocked in since"), "got: {status}");
+    // Clocking out records the elapsed session and writes a full timestamp.
+    let out = stdout(clocking(&["out"], dir.path()));
+    assert!(out.contains("worked 1 hr 30 min"), "got: {out}");
+    let log = read_log(dir.path());
+    assert_eq!(log.as_bytes()[10], b'T', "closing line should use full format: {log}");
+}
+
+#[test]
+fn summary_since_until_window() {
+    let dir = tempdir().unwrap();
+    write_log(
+        dir.path(),
+        "2026-07-05 12:00 2 hr (10:00–12:00)\n\
+         2026-07-08 17:00 5 hr (12:00–17:00)\n\
+         2026-07-20 12:00 9 hr (03:00–12:00)\n",
+    );
+    let out = stdout(clocking(&["summary", "--since", "2026-07-06", "--until", "2026-07-09"], dir.path()));
+    assert!(out.contains("Worked: 5 hr (1 session)"), "got: {out}");
+}
+
+#[test]
+fn log_last_limits_entries() {
+    let dir = tempdir().unwrap();
+    write_log(
+        dir.path(),
+        "2026-07-05 12:00 2 hr (10:00–12:00)\n\
+         2026-07-06 12:00 3 hr (09:00–12:00)\n\
+         2026-07-07 12:00 4 hr (08:00–12:00)\n",
+    );
+    let out = stdout(clocking(&["log", "--last", "2"], dir.path()));
+    assert_eq!(out.lines().count(), 2, "got: {out}");
+    assert!(out.contains("3 hr") && out.contains("4 hr"), "got: {out}");
+    assert!(!out.contains("2 hr"), "oldest should be dropped: {out}");
+}
+
+#[test]
+fn completions_and_man_smoke() {
+    let dir = tempdir().unwrap();
+    let comp = stdout(clocking(&["completions", "bash"], dir.path()));
+    assert!(comp.contains("clocking"), "completion script should mention the binary");
+    let man = stdout(clocking(&["man"], dir.path()));
+    assert!(man.contains("clocking"), "man page should mention the binary");
 }
 
 #[test]

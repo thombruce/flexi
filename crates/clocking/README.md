@@ -54,7 +54,7 @@ clocking man               # print the man page (roff) to stdout
 
 A closed session is logged as `8 hr 30 min (09:00–17:30)` — the duration followed by the clock span, timestamped when you clocked out. `clocking summary` sums the durations over the selected period. `-m`/`--note` annotates the entry on either `in` or `out`; a note given at clock-in is kept and joined with any clock-out note.
 
-Quotes are optional. All of flexi's time formats apply to durations shown, and durations display in green.
+clocking never asks you to type a duration — sessions are timed from the clock, so the only durations you see are computed output (shown in green as `N hr M min`).
 
 ### Shell completions
 
