@@ -2,14 +2,22 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
+## Workspace layout
+
+Cargo workspace (`Cargo.toml` at root, `members = ["crates/*"]`). Each tool is its own crate under `crates/`. Currently one member: `crates/flexi`. Sibling tools (e.g. `clocking`, a calendar) will be added as further crates; shared code is only extracted into a common crate once a second tool concretely repeats it — not speculatively.
+
+The rest of this file describes the `flexi` crate (`crates/flexi/`).
+
 ## Commands
 
+Cargo commands run from the repo root operate on the whole workspace; use `-p flexi` to scope to one crate.
+
 ```bash
-cargo build          # compile
-cargo run            # run (display balance)
-cargo run -- add 1 hr 30 min
-cargo run -- add 1 hr 30 min --note "reason"
-cargo run -- remove 30 min
+cargo build          # compile all crates
+cargo run -p flexi   # run flexi (display balance)
+cargo run -p flexi -- add 1 hr 30 min
+cargo run -p flexi -- add 1 hr 30 min --note "reason"
+cargo run -p flexi -- remove 30 min
 cargo test           # run all tests
 cargo test time      # run tests in a specific module
 cargo clippy         # lint (CI runs with -D warnings — fix all warnings before committing)
@@ -17,7 +25,7 @@ cargo clippy         # lint (CI runs with -D warnings — fix all warnings befor
 
 ## Architecture
 
-Single binary crate. All state is `i32` minutes internally; `time.rs` owns the boundary between minutes and human-readable strings.
+`flexi` is a single binary crate at `crates/flexi/` (`src/`, `tests/`). All state is `i32` minutes internally; `time.rs` owns the boundary between minutes and human-readable strings.
 
 **Data flow for `add`/`remove`:**
 `main.rs` joins `Vec<String>` args → `time::parse_duration` → arithmetic → `storage::append_log` → print delta.
@@ -45,16 +53,16 @@ Rounding (`time::round_to_increment`, nearest/half-up, sign-preserving) is appli
 
 ## Documentation
 
-Update `README.md` whenever user-facing behaviour changes (new commands, flags, config keys, output format). Update `CLAUDE.md` when architecture or conventions change.
+Update `crates/flexi/README.md` whenever user-facing behaviour changes (new commands, flags, config keys, output format). The root `README.md` is a workspace overview — update it when crates are added or removed. Update `CLAUDE.md` when architecture or conventions change.
 
 ## Releases
 
-Add notable changes to the `[Unreleased]` section of `CHANGELOG.md` as they are made.
+Each crate versions and changelogs independently. For flexi, add notable changes to the `[Unreleased]` section of `crates/flexi/CHANGELOG.md` as they are made.
 
-Before tagging, move `CHANGELOG.md`'s `[Unreleased]` section to a new version heading with today's date, bump the version in `Cargo.toml`, then build to update `Cargo.lock`. Commit all together.
+Before tagging, move `crates/flexi/CHANGELOG.md`'s `[Unreleased]` section to a new version heading with today's date, bump the version in `crates/flexi/Cargo.toml`, then build to update `Cargo.lock` (one lockfile at the workspace root). Commit all together.
 
-**GitHub Releases** build automatically via `.github/workflows/release.yml` on `git tag vX.Y.Z && git push --tags`.
+**GitHub Releases** build automatically via `.github/workflows/release.yml` on `git tag vX.Y.Z && git push --tags`. (Tags are currently flexi-only; when a second crate ships, switch to per-crate tag prefixes.)
 
-**crates.io:** published automatically on release via `.github/workflows/release.yml` (requires the `CARGO_REGISTRY_TOKEN` repo secret). To publish manually instead: `cargo publish` (requires `cargo login` first).
+**crates.io:** published automatically on release via `.github/workflows/release.yml` (requires the `CARGO_REGISTRY_TOKEN` repo secret). To publish manually instead: `cargo publish -p flexi` (requires `cargo login` first).
 
 **Homebrew tap:** updated automatically on release via the Git workflow.
