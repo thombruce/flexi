@@ -38,8 +38,8 @@ flexi                      # display current balance
 flexi add 1 hr 30 min     # add time
 flexi add 1 hr --note "reason"  # add time with annotation
 flexi remove 1 hr          # subtract time (alias: rm)
-flexi in                   # start a clock-in session (bank time worked on `out`)
-flexi out                  # stop the session and add the elapsed time
+flexi in                   # start a clock-in session (bank time worked on `out`); alias: flexi start
+flexi out                  # stop the session and add the elapsed time; alias: flexi stop
 flexi out --force          # bank the session even if it exceeds max_session
 flexi away                 # start a spending session (deduct time away on `back`)
 flexi back                 # stop the session and subtract the elapsed time
@@ -68,7 +68,7 @@ flexi man                  # print the man page (roff) to stdout
 
 `add` and `remove` print the change and new balance (e.g. `+1 hr 30 min → 3 hr`). `set` and `reset` print the new balance. `note` records a dated, described entry with a `+0 min` change, leaving the balance untouched (useful for marking leave days, approvals, or reconciliation checkpoints); it is excluded from `--summary` and `--prose` totals. `log` prints one entry per line: `2026-05-24 10:20  +1 hr 30 min → 3 hr`. Notes appear dimmed at the end: `2026-05-24 10:20  +1 hr 30 min → 3 hr  # reason`.
 
-`flexi in` starts a clock-in session and `flexi out` ends it, banking the elapsed time as overtime (it is *added* to your balance). While clocked in, bare `flexi` shows how long you've been clocked in, and balance-changing commands (`add`, `remove`, `set`, `reset`, `note`, a second `in`) are blocked until you run `flexi out`. The banked entry records the worked span as a note (e.g. `09:00–10:30`); pass `flexi in -m "reason"` or `flexi out -m "reason"` to annotate it. To cancel a session without banking anything, run `flexi undo` while clocked in.
+`flexi in` starts a clock-in session and `flexi out` ends it, banking the elapsed time as overtime (it is *added* to your balance). While clocked in, bare `flexi` shows how long you've been clocked in, and balance-changing commands (`add`, `remove`, `set`, `reset`, `note`, a second `in`) are blocked until you run `flexi out`. The banked entry records the worked span as a note (e.g. `09:00–10:30`); pass `flexi in -m "reason"` or `flexi out -m "reason"` to annotate it. To cancel a session without banking anything, run `flexi undo` while clocked in. `flexi start` and `flexi stop` are aliases for `in` and `out` if you find those verbs clearer for tracking overtime.
 
 `flexi away`/`flexi back` are the mirror for spending time — start a session when you step out (a long lunch, a dentist trip) and end it when you return, *subtracting* the elapsed time from your balance. They behave exactly like `in`/`out` (notes, span recording, `max_session`, `--force`, `flexi undo` to cancel) but with the opposite sign. Only one session is ever open at a time, so either closing verb (`flexi out` or `flexi back`) ends whichever session is running; the deduction-or-bank is decided by how the session was opened, not which verb closes it. For a fixed, known amount, skip the timer and use `flexi remove` directly.
 

@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- `flexi start` and `flexi stop` — aliases for `in` and `out`. `in`/`out` remain the primary verbs; `start`/`stop` are an optional, arguably clearer reading for tracking overtime (clocking keeps `in`/`out` only, where they are semantically exact).
+
 ## [0.15.1] - 2026-07-11
 
 ### Changed
