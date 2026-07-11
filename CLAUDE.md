@@ -70,12 +70,14 @@ Never commit directly to `main`. For every change, branch off `main`, commit the
 
 ## Releases
 
-Each crate versions and changelogs independently. For flexi, add notable changes to the `[Unreleased]` section of `crates/flexi/CHANGELOG.md` as they are made.
+Each crate versions, changelogs, and releases independently. Add notable changes to the `[Unreleased]` section of that crate's `CHANGELOG.md` (e.g. `crates/clocking/CHANGELOG.md`) as they are made.
 
-Before tagging, move `crates/flexi/CHANGELOG.md`'s `[Unreleased]` section to a new version heading with today's date, bump the version in `crates/flexi/Cargo.toml`, then build to update `Cargo.lock` (one lockfile at the workspace root). Commit all together.
+Before tagging a crate, move its `CHANGELOG.md` `[Unreleased]` section to a new version heading with today's date, bump the version in that crate's `Cargo.toml`, then build to update `Cargo.lock` (one lockfile at the workspace root). Commit all together.
 
-**GitHub Releases** build automatically via `.github/workflows/release.yml` on `git tag vX.Y.Z && git push --tags`. (Tags are currently flexi-only; when a second crate ships, switch to per-crate tag prefixes.)
+**Tag scheme:** `<crate>-vX.Y.Z` (e.g. `flexi-v0.15.0`, `clocking-v0.1.0`). `.github/workflows/release.yml` is a single generic workflow triggered by any `*-vX.Y.Z` tag; its `setup` job derives the crate name and version from the tag (`crate = ${TAG%-v*}`, `version = ${TAG##*-v}`) and every downstream job is parameterised on them. To release: `git tag <crate>-vX.Y.Z && git push --tags`.
 
-**crates.io:** published automatically on release via `.github/workflows/release.yml` (requires the `CARGO_REGISTRY_TOKEN` repo secret). To publish manually instead: `cargo publish -p flexi` (requires `cargo login` first).
+- **GitHub Release** — builds the four target archives (`<crate>-vX.Y.Z-<target>.tar.gz`) and attaches them.
+- **crates.io** — `cargo publish -p <crate>` (requires the `CARGO_REGISTRY_TOKEN` secret). Manual fallback: same command locally after `cargo login`.
+- **Homebrew tap** — writes `Formula/<crate>.rb` (class = capitalised crate, `desc` read from the crate's `Cargo.toml`, `test` runs `<crate> --version`) and pushes to `thombruce/homebrew-tap`.
 
-**Homebrew tap:** updated automatically on release via the Git workflow.
+Adding a new crate needs no workflow edits — it releases as soon as you push a `<crate>-vX.Y.Z` tag.

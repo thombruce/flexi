@@ -1,16 +1,32 @@
 name: Release
 
+# Per-crate tags: `<crate>-vX.Y.Z` (e.g. `flexi-v0.15.0`, `clocking-v0.1.0`).
+# The crate name and version are derived from the tag by the `setup` job.
 on:
   push:
     tags:
-      - 'v*'
+      - '*-v[0-9]+.[0-9]+.[0-9]+'
 
 permissions:
   contents: write
 
 jobs:
+  setup:
+    name: Resolve crate and version
+    runs-on: ubuntu-latest
+    outputs:
+      crate: ${{ steps.parse.outputs.crate }}
+      version: ${{ steps.parse.outputs.version }}
+    steps:
+      - id: parse
+        run: |
+          TAG="${{ github.ref_name }}"
+          echo "crate=${TAG%-v*}" >> "$GITHUB_OUTPUT"
+          echo "version=${TAG##*-v}" >> "$GITHUB_OUTPUT"
+
   build:
-    name: Build ${{ matrix.target }}
+    name: Build ${{ needs.setup.outputs.crate }} ${{ matrix.target }}
+    needs: setup
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:
@@ -42,17 +58,22 @@ jobs:
         run: cargo install cross --git https://github.com/cross-rs/cross
 
       - name: Build
+        env:
+          CRATE: ${{ needs.setup.outputs.crate }}
         run: |
           if [ "${{ matrix.cross }}" = "true" ]; then
-            cross build --release --target ${{ matrix.target }}
+            cross build --release -p "$CRATE" --target ${{ matrix.target }}
           else
-            cargo build --release --target ${{ matrix.target }}
+            cargo build --release -p "$CRATE" --target ${{ matrix.target }}
           fi
 
       - name: Package
+        env:
+          CRATE: ${{ needs.setup.outputs.crate }}
+          VERSION: ${{ needs.setup.outputs.version }}
         run: |
-          BINARY=target/${{ matrix.target }}/release/flexi
-          ARCHIVE=flexi-${{ github.ref_name }}-${{ matrix.target }}.tar.gz
+          BINARY=target/${{ matrix.target }}/release/$CRATE
+          ARCHIVE=$CRATE-v$VERSION-${{ matrix.target }}.tar.gz
           tar -czf "$ARCHIVE" -C "$(dirname $BINARY)" "$(basename $BINARY)"
           echo "ARCHIVE=$ARCHIVE" >> $GITHUB_ENV
 
@@ -80,6 +101,7 @@ jobs:
 
   publish-crate:
     name: Publish to crates.io
+    needs: setup
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v5
@@ -88,24 +110,36 @@ jobs:
         uses: dtolnay/rust-toolchain@stable
 
       - name: Publish
-        run: cargo publish -p flexi
+        run: cargo publish -p "${{ needs.setup.outputs.crate }}"
         env:
           CARGO_REGISTRY_TOKEN: ${{ secrets.CARGO_REGISTRY_TOKEN }}
 
   update-homebrew:
     name: Update Homebrew Formula
-    needs: release
+    needs: [setup, release]
     runs-on: ubuntu-latest
     steps:
-      - name: Compute SHA256s
+      - uses: actions/checkout@v5
+
+      - name: Compute formula vars
+        env:
+          CRATE: ${{ needs.setup.outputs.crate }}
+          VERSION: ${{ needs.setup.outputs.version }}
+          TAG: ${{ github.ref_name }}
         run: |
-          VERSION="${{ github.ref_name }}"
-          BASE="https://github.com/thombruce/flexi/releases/download/${VERSION}"
-          echo "VERSION=${VERSION#v}" >> $GITHUB_ENV
-          echo "SHA256_X86_MAC=$(curl -sL ${BASE}/flexi-${VERSION}-x86_64-apple-darwin.tar.gz | sha256sum | cut -d' ' -f1)" >> $GITHUB_ENV
-          echo "SHA256_ARM_MAC=$(curl -sL ${BASE}/flexi-${VERSION}-aarch64-apple-darwin.tar.gz | sha256sum | cut -d' ' -f1)" >> $GITHUB_ENV
-          echo "SHA256_X86_LINUX=$(curl -sL ${BASE}/flexi-${VERSION}-x86_64-unknown-linux-gnu.tar.gz | sha256sum | cut -d' ' -f1)" >> $GITHUB_ENV
-          echo "SHA256_ARM_LINUX=$(curl -sL ${BASE}/flexi-${VERSION}-aarch64-unknown-linux-gnu.tar.gz | sha256sum | cut -d' ' -f1)" >> $GITHUB_ENV
+          BASE="https://github.com/thombruce/flexi/releases/download/${TAG}"
+          DESC=$(grep -m1 '^description' "crates/${CRATE}/Cargo.toml" | sed -E 's/^description *= *"(.*)"/\1/')
+          CLASS="$(printf '%s' "${CRATE:0:1}" | tr '[:lower:]' '[:upper:]')${CRATE:1}"
+          {
+            echo "CRATE=$CRATE"
+            echo "VERSION=$VERSION"
+            echo "DESC=$DESC"
+            echo "CLASS=$CLASS"
+            echo "SHA256_X86_MAC=$(curl -sL ${BASE}/${CRATE}-v${VERSION}-x86_64-apple-darwin.tar.gz | sha256sum | cut -d' ' -f1)"
+            echo "SHA256_ARM_MAC=$(curl -sL ${BASE}/${CRATE}-v${VERSION}-aarch64-apple-darwin.tar.gz | sha256sum | cut -d' ' -f1)"
+            echo "SHA256_X86_LINUX=$(curl -sL ${BASE}/${CRATE}-v${VERSION}-x86_64-unknown-linux-gnu.tar.gz | sha256sum | cut -d' ' -f1)"
+            echo "SHA256_ARM_LINUX=$(curl -sL ${BASE}/${CRATE}-v${VERSION}-aarch64-unknown-linux-gnu.tar.gz | sha256sum | cut -d' ' -f1)"
+          } >> "$GITHUB_ENV"
 
       - name: Clone homebrew-tap
         run: |
@@ -113,41 +147,41 @@ jobs:
 
       - name: Update formula
         run: |
-          cat > homebrew-tap/Formula/flexi.rb << EOF
-          class Flexi < Formula
-            desc "A minimal CLI tool for tracking your flexi-time balance"
+          cat > homebrew-tap/Formula/${CRATE}.rb << EOF
+          class ${CLASS} < Formula
+            desc "${DESC}"
             homepage "https://github.com/thombruce/flexi"
-            version "${{ env.VERSION }}"
+            version "${VERSION}"
             license "MIT"
 
             on_macos do
               on_arm do
-                url "https://github.com/thombruce/flexi/releases/download/v#{version}/flexi-v#{version}-aarch64-apple-darwin.tar.gz"
-                sha256 "${{ env.SHA256_ARM_MAC }}"
+                url "https://github.com/thombruce/flexi/releases/download/${CRATE}-v#{version}/${CRATE}-v#{version}-aarch64-apple-darwin.tar.gz"
+                sha256 "${SHA256_ARM_MAC}"
               end
               on_intel do
-                url "https://github.com/thombruce/flexi/releases/download/v#{version}/flexi-v#{version}-x86_64-apple-darwin.tar.gz"
-                sha256 "${{ env.SHA256_X86_MAC }}"
+                url "https://github.com/thombruce/flexi/releases/download/${CRATE}-v#{version}/${CRATE}-v#{version}-x86_64-apple-darwin.tar.gz"
+                sha256 "${SHA256_X86_MAC}"
               end
             end
 
             on_linux do
               on_arm do
-                url "https://github.com/thombruce/flexi/releases/download/v#{version}/flexi-v#{version}-aarch64-unknown-linux-gnu.tar.gz"
-                sha256 "${{ env.SHA256_ARM_LINUX }}"
+                url "https://github.com/thombruce/flexi/releases/download/${CRATE}-v#{version}/${CRATE}-v#{version}-aarch64-unknown-linux-gnu.tar.gz"
+                sha256 "${SHA256_ARM_LINUX}"
               end
               on_intel do
-                url "https://github.com/thombruce/flexi/releases/download/v#{version}/flexi-v#{version}-x86_64-unknown-linux-gnu.tar.gz"
-                sha256 "${{ env.SHA256_X86_LINUX }}"
+                url "https://github.com/thombruce/flexi/releases/download/${CRATE}-v#{version}/${CRATE}-v#{version}-x86_64-unknown-linux-gnu.tar.gz"
+                sha256 "${SHA256_X86_LINUX}"
               end
             end
 
             def install
-              bin.install "flexi"
+              bin.install "${CRATE}"
             end
 
             test do
-              assert_match "0 min", shell_output("#{bin}/flexi")
+              system "#{bin}/${CRATE}", "--version"
             end
           end
           EOF
@@ -157,6 +191,6 @@ jobs:
           cd homebrew-tap
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git config user.name "github-actions[bot]"
-          git add Formula/flexi.rb
-          git commit -m "chore: update flexi to v${{ env.VERSION }}"
+          git add Formula/${CRATE}.rb
+          git commit -m "chore: update ${CRATE} to v${VERSION}"
           git push
