@@ -55,6 +55,14 @@ Rounding (`time::round_to_increment`, nearest/half-up, sign-preserving) is appli
 
 Update `crates/flexi/README.md` whenever user-facing behaviour changes (new commands, flags, config keys, output format). The root `README.md` is a workspace overview — update it when crates are added or removed. Update `CLAUDE.md` when architecture or conventions change.
 
+## Git workflow
+
+Never commit directly to `main`. For every change, branch off `main`, commit there, push, and open a PR — even for small or solo work. Let CI (test + clippy) run before merging.
+
+- Branch names: `type/short-description` (e.g. `feat/clocking-crate`, `chore/cargo-workspace`, `fix/rounding-sign`).
+- Commit messages and PR titles follow Conventional Commits (`feat:`, `fix:`, `chore:`, `docs:`, `refactor:`), matching the existing history.
+- Keep the changelog current on the branch (see Releases) so PRs are self-contained.
+
 ## Releases
 
 Each crate versions and changelogs independently. For flexi, add notable changes to the `[Unreleased]` section of `crates/flexi/CHANGELOG.md` as they are made.
