@@ -16,6 +16,12 @@ clocking summary --week  # Worked: 38 hr 15 min (5 sessions)
 
 ## Installation
 
+**Homebrew** (macOS/Linux):
+```sh
+brew tap thombruce/tap
+brew install thombruce/tap/clocking
+```
+
 **crates.io** (requires Rust):
 ```sh
 cargo install clocking
