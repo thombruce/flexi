@@ -18,28 +18,34 @@ impl LogEntry {
         self.body() == "@in"
     }
 
-    /// Worked minutes for a completed session line (`8 hr 30 min (09:00–17:30)`).
-    /// Returns None for open `@in` markers.
+    /// Worked minutes for a completed session line (`17:00 = 8 hr 30 min`, the
+    /// recorded duration after ` = `). Returns None for open `@in` markers.
     pub fn session_minutes(&self) -> Option<i32> {
         if self.is_open() {
             return None;
         }
-        let body = self.body();
-        let dur = body.split_once(" (").map(|(d, _)| d).unwrap_or(body);
+        let (_, dur) = self.body().rsplit_once(" = ")?;
         parse_duration(dur).ok()
     }
 }
 
-pub fn append_log(path: &Path, description: &str, ts_format: TimestampFormat) -> Result<()> {
+/// The current local time rendered in the configured timestamp format.
+pub fn now_timestamp(ts_format: TimestampFormat) -> String {
+    let now = chrono::Local::now();
+    match ts_format {
+        TimestampFormat::Simple => now.format("%Y-%m-%d %H:%M").to_string(),
+        TimestampFormat::Full => now.to_rfc3339_opts(chrono::SecondsFormat::Secs, false),
+    }
+}
+
+/// Appends a line `<timestamp> <description>`. The caller supplies the leading
+/// timestamp so a closed session can be keyed by its clock-in time (see the
+/// `out` handler), not the moment the line is written.
+pub fn append_log(path: &Path, timestamp: &str, description: &str) -> Result<()> {
     if let Some(parent) = path.parent() {
         std::fs::create_dir_all(parent)
             .with_context(|| format!("creating directory {:?}", parent))?;
     }
-    let now = chrono::Local::now();
-    let timestamp = match ts_format {
-        TimestampFormat::Simple => now.format("%Y-%m-%d %H:%M").to_string(),
-        TimestampFormat::Full => now.to_rfc3339_opts(chrono::SecondsFormat::Secs, false),
-    };
     let line = format!("{} {}\n", timestamp, description);
     use std::io::Write;
     let mut file = std::fs::OpenOptions::new()
@@ -117,22 +123,22 @@ mod tests {
     fn open_marker_detection() {
         assert!(entry("@in").is_open());
         assert!(entry("@in # project x").is_open());
-        assert!(!entry("8 hr 30 min (09:00–17:30)").is_open());
+        assert!(!entry("17:30 = 8 hr 30 min").is_open());
     }
 
     #[test]
-    fn session_minutes_parses_duration_before_span() {
-        assert_eq!(entry("8 hr 30 min (09:00–17:30)").session_minutes(), Some(510));
+    fn session_minutes_parses_duration_after_equals() {
+        assert_eq!(entry("17:30 = 8 hr 30 min").session_minutes(), Some(510));
     }
 
     #[test]
-    fn session_minutes_without_span() {
-        assert_eq!(entry("45 min").session_minutes(), Some(45));
+    fn session_minutes_cross_day_end() {
+        assert_eq!(entry("2026-07-12 04:00 = 8 hr").session_minutes(), Some(480));
     }
 
     #[test]
     fn session_minutes_strips_note() {
-        assert_eq!(entry("2 hr (09:00–11:00) # standup").session_minutes(), Some(120));
+        assert_eq!(entry("11:00 = 2 hr # standup").session_minutes(), Some(120));
     }
 
     #[test]
@@ -143,11 +149,11 @@ mod tests {
 
     #[test]
     fn parse_log_line_simple_and_full() {
-        let e = parse_log_line("2026-07-11 17:30 8 hr 30 min (09:00–17:30)").unwrap();
-        assert_eq!(e.timestamp, "2026-07-11 17:30");
-        assert_eq!(e.description, "8 hr 30 min (09:00–17:30)");
-        let f = parse_log_line("2026-07-11T17:30:16+01:00 @in").unwrap();
-        assert_eq!(f.timestamp, "2026-07-11T17:30:16+01:00");
+        let e = parse_log_line("2026-07-11 09:00 17:30 = 8 hr 30 min").unwrap();
+        assert_eq!(e.timestamp, "2026-07-11 09:00");
+        assert_eq!(e.description, "17:30 = 8 hr 30 min");
+        let f = parse_log_line("2026-07-11T09:00:16+01:00 @in").unwrap();
+        assert_eq!(f.timestamp, "2026-07-11T09:00:16+01:00");
         assert_eq!(f.description, "@in");
     }
 
