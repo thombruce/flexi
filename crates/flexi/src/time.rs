@@ -33,10 +33,8 @@ fn parse_compact(s: &str) -> Option<i32> {
         let rest = &s[h_pos + 1..];
         let mins: f64 = if rest.is_empty() {
             0.0
-        } else if let Some(stripped) = rest.strip_suffix('m') {
-            stripped.parse().ok()?
         } else {
-            return None;
+            rest.strip_suffix('m')?.parse().ok()?
         };
         Some((hours * 60.0 + mins).round() as i32)
     } else if let Some(stripped) = s.strip_suffix('m') {
