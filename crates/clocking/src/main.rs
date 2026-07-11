@@ -258,7 +258,7 @@ fn main() -> Result<()> {
             if let Some(n) = note {
                 desc.push_str(&format!(" # {}", n));
             }
-            storage::append_log(&cfg.path, &desc, cfg.timestamp_format)?;
+            storage::append_log(&cfg.path, &storage::now_timestamp(cfg.timestamp_format), &desc)?;
             println!("clocked in at {}", chrono::Local::now().format("%H:%M"));
         }
         Some(Commands::Out { note, force }) => {
@@ -282,17 +282,27 @@ fn main() -> Result<()> {
                 }
             }
             let elapsed = time::round_to_increment(elapsed, cfg.increment);
-            let span = format!("{}–{}", start.format("%H:%M"), now.format("%H:%M"));
-            let mut desc = format!("{} ({})", time::format_duration(elapsed), span);
+            // End field: a bare `HH:MM` for a same-day shift, or a full
+            // `YYYY-MM-DD HH:MM` when the shift crossed midnight (so no start
+            // date is lost). `full` timestamp mode always writes a full end.
+            let end_field = match cfg.timestamp_format {
+                config::TimestampFormat::Full => now.to_rfc3339_opts(chrono::SecondsFormat::Secs, false),
+                config::TimestampFormat::Simple if now.date_naive() == start.date_naive() => {
+                    now.format("%H:%M").to_string()
+                }
+                config::TimestampFormat::Simple => now.format("%Y-%m-%d %H:%M").to_string(),
+            };
+            let mut desc = format!("{} = {}", end_field, time::format_duration(elapsed));
             // Keep both the clock-in note and any clock-out `-m` note; don't drop either.
             let open_note = entry.description.split_once(" # ").map(|(_, n)| n.to_string());
             let extra: Vec<String> = [open_note, note].into_iter().flatten().collect();
             if !extra.is_empty() {
                 desc.push_str(&format!(" # {}", extra.join("; ")));
             }
+            // Key the closed line by the clock-in timestamp (the marker's), not now.
             storage::pop_log(&cfg.path)?;
-            storage::append_log(&cfg.path, &desc, cfg.timestamp_format)?;
-            println!("clocked out — worked {} ({})", worked(elapsed), span);
+            storage::append_log(&cfg.path, &entry.timestamp, &desc)?;
+            println!("clocked out — worked {} ({}–{})", worked(elapsed), start.format("%H:%M"), end_field);
         }
         Some(Commands::Log { filter, summary }) => {
             run_log(&cfg, &filter, summary)?;

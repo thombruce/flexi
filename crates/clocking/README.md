@@ -58,7 +58,16 @@ clocking man               # print the man page (roff) to stdout
 
 `clocking in` opens a session; `clocking out` closes it and records the hours worked. Only one session is open at a time — a second `clocking in` is rejected until you clock out. While clocked in, bare `clocking` shows how long you've been clocked in; when clocked out it shows today's total. To discard an open session without recording it, run `clocking undo` while clocked in.
 
-A closed session is logged as `8 hr 30 min (09:00–17:30)` — the duration followed by the clock span, timestamped when you clocked out. `clocking summary` sums the durations over the selected period. `-m`/`--note` annotates the entry on either `in` or `out`; a note given at clock-in is kept and joined with any clock-out note.
+A closed session is logged as `<clock-in> <end> = <duration>`, keyed by the time you clocked **in**:
+
+```
+2026-07-11 09:00 17:00 = 8 hr           # a same-day shift
+2026-07-11 20:00 2026-07-12 04:00 = 8 hr  # a shift crossing midnight
+```
+
+The leading timestamp is the clock-in time; the end field is a bare `HH:MM` for a same-day shift, or a full date + time when the shift crosses midnight (so no information is lost). The `= <duration>` is the recorded worked time — with `increment` rounding on, this is the rounded value and may differ from the raw span. Because sessions are dated by clock-in, a shift that runs past midnight counts on the day it *started*. (In `full` timestamp mode both endpoints are always written as full timestamps.)
+
+`clocking summary` sums the `= <duration>` values over the selected period. `-m`/`--note` annotates the entry on either `in` or `out`; a note given at clock-in is kept and joined with any clock-out note.
 
 clocking never asks you to type a duration — sessions are timed from the clock, so the only durations you see are computed output (shown in green as `N hr M min`).
 
@@ -100,7 +109,7 @@ max_session = 1440           # warn/refuse if a session exceeds this many minute
 
 `increment` rounds each recorded session's elapsed time to the nearest multiple of that many minutes (half rounds up). `max_session` guards against a forgotten `clocking out`: a session longer than this many minutes refuses to record (run `clocking out --force` to record it anyway), and bare `clocking` warns while clocked in. Both must be at least 1; `max_session` is unset by default.
 
-Without config, data is stored at `~/.local/share/clocking/clocking.txt` (or the platform equivalent). This file is an append-only log of worked sessions; a session dated by the day you clock out.
+Without config, data is stored at `~/.local/share/clocking/clocking.txt` (or the platform equivalent). This file is an append-only log of worked sessions, each dated by the day you clocked in.
 
 ## License
 
