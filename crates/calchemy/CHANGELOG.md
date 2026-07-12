@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- Multi-day all-day events: `DATE END-DATE # TITLE` (e.g. `2026-07-17 2026-07-20 # Wedding`, inclusive last day), and `calchemy add <date> <end-date> <title>`. The end date must be after the start date.
+
+### Changed
+
+- Appointments spanning several days (multi-day all-day, or timed events crossing midnight) now appear on every day they cover: an ongoing event shows in today's agenda and the default/windowed `list` views, and counts as `--past` only after its last day.
+
 ## [0.1.0] - 2026-07-11
 
 ### Added
