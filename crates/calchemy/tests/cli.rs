@@ -62,6 +62,28 @@ fn multi_day_all_day_spans() {
 }
 
 #[test]
+fn add_timed_multi_day() {
+    let dir = tempdir().unwrap();
+    calchemy(&["add", "2026-07-17", "09:00", "2026-07-20", "17:00", "Conference"], dir.path()).success();
+    // Same-day explicit end collapses to the canonical HH:MM form.
+    calchemy(&["add", "2026-08-01", "09:00", "2026-08-01", "10:00", "Sameday"], dir.path()).success();
+    // A date after the start time with no end time belongs to the title.
+    calchemy(&["add", "2026-09-01", "09:00", "2026-09-02", "deadline"], dir.path()).success();
+    let log = read_log(dir.path());
+    assert!(log.contains("2026-07-17 09:00 2026-07-20 17:00 # Conference"), "{log}");
+    assert!(log.contains("2026-08-01 09:00 10:00 # Sameday"), "{log}");
+    assert!(log.contains("2026-09-01 09:00 # 2026-09-02 deadline"), "{log}");
+}
+
+#[test]
+fn add_timed_multi_day_rejects_end_before_start() {
+    let dir = tempdir().unwrap();
+    calchemy(&["add", "2026-07-17", "09:00", "2026-07-16", "17:00", "Backwards"], dir.path())
+        .failure()
+        .stderr(predicates::str::contains("must be after"));
+}
+
+#[test]
 fn add_rejects_end_date_not_after_start() {
     let dir = tempdir().unwrap();
     calchemy(&["add", "2026-07-17", "2026-07-16", "Backwards"], dir.path())

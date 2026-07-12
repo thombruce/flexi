@@ -17,11 +17,12 @@ struct Cli {
 
 #[derive(Subcommand)]
 enum Commands {
-    /// Add an appointment: `add <date> [HH:MM[-HH:MM] | <end-date>] <title...>`
+    /// Add an appointment: `add <date> [HH:MM[-HH:MM] | HH:MM <end-date> HH:MM | <end-date>] <title...>`
     Add {
         /// Appointment date, `YYYY-MM-DD`
         date: String,
-        /// Optional `HH:MM`, `HH:MM-HH:MM`, or end date `YYYY-MM-DD` (multi-day
+        /// Optional `HH:MM`, `HH:MM-HH:MM`, `HH:MM YYYY-MM-DD HH:MM` (timed,
+        /// ending on a later day), or end date `YYYY-MM-DD` (multi-day
         /// all-day, inclusive), then the title
         #[arg(required = true)]
         rest: Vec<String>,
@@ -265,12 +266,26 @@ fn main() -> Result<()> {
             // The first arg may be a time or an end date; if so the rest is the title.
             let (start, end, title_parts): (Option<NaiveTime>, Option<chrono::NaiveDateTime>, &[String]) =
                 if let Some((s, e)) = parse_time_arg(&rest[0]) {
-                    // Build the end datetime: same day, or next day if end <= start.
-                    let end = e.map(|e| {
-                        let end_date = if e > s { date } else { date + chrono::Duration::days(1) };
-                        end_date.and_time(e)
-                    });
-                    (Some(s), end, &rest[1..])
+                    // A bare start may be followed by `END-DATE HH:MM`: a timed
+                    // end on a later day.
+                    let explicit_end = (e.is_none() && rest.len() >= 3)
+                        .then(|| {
+                            let ed = NaiveDate::parse_from_str(&rest[1], "%Y-%m-%d").ok()?;
+                            let et = NaiveTime::parse_from_str(&rest[2], "%H:%M").ok()?;
+                            Some(ed.and_time(et))
+                        })
+                        .flatten();
+                    if let Some(end) = explicit_end {
+                        anyhow::ensure!(end > date.and_time(s), "end {} must be after the start", end.format("%Y-%m-%d %H:%M"));
+                        (Some(s), Some(end), &rest[3..])
+                    } else {
+                        // Build the end datetime: same day, or next day if end <= start.
+                        let end = e.map(|e| {
+                            let end_date = if e > s { date } else { date + chrono::Duration::days(1) };
+                            end_date.and_time(e)
+                        });
+                        (Some(s), end, &rest[1..])
+                    }
                 } else if let Ok(end_date) = NaiveDate::parse_from_str(&rest[0], "%Y-%m-%d") {
                     anyhow::ensure!(end_date > date, "end date {} must be after {}", end_date, date);
                     (None, Some(end_date.and_time(NaiveTime::MIN)), &rest[1..])
