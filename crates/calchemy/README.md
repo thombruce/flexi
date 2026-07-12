@@ -41,6 +41,7 @@ calchemy add 2026-07-14 Dentist       # all-day appointment
 calchemy add 2026-07-14 09:00 Standup # timed
 calchemy add 2026-07-14 09:00-10:00 Dentist @clinic  # with an end time
 calchemy add 2026-07-17 2026-07-20 Wedding  # multi-day all-day
+calchemy add 2026-07-17 09:00 2026-07-20 17:00 Conference  # timed, ends on a later day
 calchemy next                         # the soonest upcoming appointment
 calchemy list                         # upcoming appointments (alias: agenda)
 calchemy list --today                 # today only
@@ -57,7 +58,7 @@ calchemy completions <shell>          # print a shell completion script
 calchemy man                          # print the man page (roff) to stdout
 ```
 
-`add` takes an explicit `YYYY-MM-DD` date, then optionally a time (`HH:MM`), a time range (`HH:MM-HH:MM`), or an end date (`YYYY-MM-DD`, making a multi-day all-day event through that day inclusive), then the title. If the end of a time range is at or before the start, it is taken to be the next day (`20:00-02:00` → ends 02:00 tomorrow).
+`add` takes an explicit `YYYY-MM-DD` date, then optionally a time (`HH:MM`), a time range (`HH:MM-HH:MM`), a timed end on a later day (`HH:MM YYYY-MM-DD HH:MM`), or an end date (`YYYY-MM-DD`, making a multi-day all-day event through that day inclusive), then the title. If the end of a time range is at or before the start, it is taken to be the next day (`20:00-02:00` → ends 02:00 tomorrow). A leading title word that looks like a time or date is claimed by these forms — an end date after a start time is only claimed when followed by an end time.
 
 An appointment spanning several days appears on every day it covers — a multi-day event that started yesterday still shows in today's agenda and the upcoming `list`, and only moves to `--past` once its last day has passed.
 
