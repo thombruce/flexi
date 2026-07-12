@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.2.0] - 2026-07-12
+
 ### Added
 
 - Multi-day all-day events: `DATE END-DATE # TITLE` (e.g. `2026-07-17 2026-07-20 # Wedding`, inclusive last day), and `calchemy add <date> <end-date> <title>`. The end date must be after the start date.
