@@ -17,11 +17,12 @@ struct Cli {
 
 #[derive(Subcommand)]
 enum Commands {
-    /// Add an appointment: `add <date> [HH:MM[-HH:MM]] <title...>`
+    /// Add an appointment: `add <date> [HH:MM[-HH:MM] | <end-date>] <title...>`
     Add {
         /// Appointment date, `YYYY-MM-DD`
         date: String,
-        /// Optional `HH:MM` or `HH:MM-HH:MM`, then the title
+        /// Optional `HH:MM`, `HH:MM-HH:MM`, or end date `YYYY-MM-DD` (multi-day
+        /// all-day, inclusive), then the title
         #[arg(required = true)]
         rest: Vec<String>,
     },
@@ -105,10 +106,13 @@ fn time_col(a: &Appt) -> Option<String> {
     })
 }
 
-/// One-line rendering: `DATE [TIME] TITLE`.
+/// One-line rendering: `DATE [TIME | END-DATE] TITLE`.
 fn render_inline(a: &Appt) -> String {
     match time_col(a) {
         Some(t) => format!("{} {} {}", a.date.format("%Y-%m-%d"), t, a.title),
+        None if a.end.is_some() => {
+            format!("{} {} {}", a.date.format("%Y-%m-%d"), a.last_date().format("%Y-%m-%d"), a.title)
+        }
         None => format!("{} {}", a.date.format("%Y-%m-%d"), a.title),
     }
 }
@@ -169,15 +173,16 @@ fn run_list(cfg: &config::ResolvedConfig, f: &ApptFilter) -> Result<()> {
     let (since, until) = filter_window(cfg, f, today)?;
 
     let windowed = since.is_some() || until.is_some() || f.today || f.week || f.month;
+    // An appointment is in a window if its [date, last_date] span overlaps it.
     let view: Vec<Appt> = appts.into_iter().filter(|a| {
         if windowed {
-            since.is_none_or(|s| a.date >= s) && until.is_none_or(|u| a.date <= u)
+            since.is_none_or(|s| a.last_date() >= s) && until.is_none_or(|u| a.date <= u)
         } else if f.all {
             true
         } else if f.past {
-            a.date < today
+            a.last_date() < today
         } else {
-            a.date >= today
+            a.last_date() >= today
         }
     }).collect();
 
@@ -197,7 +202,7 @@ fn run_list(cfg: &config::ResolvedConfig, f: &ApptFilter) -> Result<()> {
 /// The default upcoming view (today onward, sorted) — also what `rm` indexes.
 fn upcoming(cfg: &config::ResolvedConfig, today: NaiveDate) -> Result<Vec<Appt>> {
     let appts = storage::read_appts(&cfg.path)?;
-    Ok(sorted(appts.into_iter().filter(|a| a.date >= today).collect()))
+    Ok(sorted(appts.into_iter().filter(|a| a.last_date() >= today).collect()))
 }
 
 fn main() -> Result<()> {
@@ -221,7 +226,10 @@ fn main() -> Result<()> {
         // Bare invocation: today's agenda.
         None | Some(Commands::Today) => {
             let todays: Vec<Appt> = sorted(
-                storage::read_appts(&cfg.path)?.into_iter().filter(|a| a.date == today).collect(),
+                storage::read_appts(&cfg.path)?
+                    .into_iter()
+                    .filter(|a| a.date <= today && a.last_date() >= today)
+                    .collect(),
             );
             if todays.is_empty() {
                 println!("no appointments today");
@@ -254,21 +262,24 @@ fn main() -> Result<()> {
         }
         Some(Commands::Add { date, rest }) => {
             let date = parse_date(&date)?;
-            // The first arg may be a time; if so the rest is the title.
-            let (start, end_time, title_parts): (Option<NaiveTime>, Option<NaiveTime>, &[String]) =
-                match parse_time_arg(&rest[0]) {
-                    Some((s, e)) => (Some(s), e, &rest[1..]),
-                    None => (None, None, &rest[..]),
+            // The first arg may be a time or an end date; if so the rest is the title.
+            let (start, end, title_parts): (Option<NaiveTime>, Option<chrono::NaiveDateTime>, &[String]) =
+                if let Some((s, e)) = parse_time_arg(&rest[0]) {
+                    // Build the end datetime: same day, or next day if end <= start.
+                    let end = e.map(|e| {
+                        let end_date = if e > s { date } else { date + chrono::Duration::days(1) };
+                        end_date.and_time(e)
+                    });
+                    (Some(s), end, &rest[1..])
+                } else if let Ok(end_date) = NaiveDate::parse_from_str(&rest[0], "%Y-%m-%d") {
+                    anyhow::ensure!(end_date > date, "end date {} must be after {}", end_date, date);
+                    (None, Some(end_date.and_time(NaiveTime::MIN)), &rest[1..])
+                } else {
+                    (None, None, &rest[..])
                 };
             let title = title_parts.join(" ");
             anyhow::ensure!(!title.trim().is_empty(), "an appointment needs a title");
             anyhow::ensure!(!title.contains(['\n', '\r']), "title must not contain newlines");
-
-            // Build the end datetime: same day, or next day if end <= start.
-            let end = end_time.map(|e| {
-                let end_date = if Some(e) > start { date } else { date + chrono::Duration::days(1) };
-                end_date.and_time(e)
-            });
             let appt = Appt { date, start, end, title: title.clone(), raw: String::new() };
             storage::append_appt(&cfg.path, &appt)?;
             println!("added: {}", render_inline(&appt));

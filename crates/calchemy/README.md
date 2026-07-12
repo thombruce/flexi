@@ -40,6 +40,7 @@ calchemy                              # today's agenda
 calchemy add 2026-07-14 Dentist       # all-day appointment
 calchemy add 2026-07-14 09:00 Standup # timed
 calchemy add 2026-07-14 09:00-10:00 Dentist @clinic  # with an end time
+calchemy add 2026-07-17 2026-07-20 Wedding  # multi-day all-day
 calchemy next                         # the soonest upcoming appointment
 calchemy list                         # upcoming appointments (alias: agenda)
 calchemy list --today                 # today only
@@ -56,7 +57,9 @@ calchemy completions <shell>          # print a shell completion script
 calchemy man                          # print the man page (roff) to stdout
 ```
 
-`add` takes an explicit `YYYY-MM-DD` date, an optional time (`HH:MM`) or time range (`HH:MM-HH:MM`), then the title. If the end of a range is at or before the start, it is taken to be the next day (`20:00-02:00` → ends 02:00 tomorrow).
+`add` takes an explicit `YYYY-MM-DD` date, then optionally a time (`HH:MM`), a time range (`HH:MM-HH:MM`), or an end date (`YYYY-MM-DD`, making a multi-day all-day event through that day inclusive), then the title. If the end of a time range is at or before the start, it is taken to be the next day (`20:00-02:00` → ends 02:00 tomorrow).
+
+An appointment spanning several days appears on every day it covers — a multi-day event that started yesterday still shows in today's agenda and the upcoming `list`, and only moves to `--past` once its last day has passed.
 
 Appointments are always listed in chronological order regardless of their order in the file; all-day events sort before timed ones on the same day. `list` shows upcoming appointments (today onward) by default — use `--all`, `--past`, or a date filter to see others. Unlike flexi/clocking's backward-looking logs, `--week` and `--month` show the **whole** calendar week/month, including future days.
 
@@ -71,13 +74,14 @@ The calendar is a plaintext file, one appointment per line, hand-editable:
 2026-07-14 09:00 # Standup
 2026-07-14 09:00 10:00 # Dentist @clinic
 2026-07-14 20:00 2026-07-15 02:00 # Party
+2026-07-17 2026-07-20 # Wedding
 ```
 
 Each line is `DATE [START [END]] # TITLE`:
 
 - `DATE` is `YYYY-MM-DD` and always leads the line, so the file greps and sorts chronologically.
 - `START` is `HH:MM`; omit it for an all-day event.
-- `END` is `HH:MM` for a same-day finish, or `YYYY-MM-DD HH:MM` when the appointment runs into a later day.
+- `END` is `HH:MM` for a same-day finish, or `YYYY-MM-DD HH:MM` when the appointment runs into a later day. With no `START`, a bare `YYYY-MM-DD` end makes a multi-day all-day event (inclusive last day; must be after `DATE`).
 - Everything after ` # ` is the title (free text; `@location` and `+tag` conventions can live inside it).
 
 The ` # ` separator matches the note convention in flexi and clocking — machine-readable fields before it, human text after.
@@ -95,7 +99,7 @@ Without config, the calendar lives at `~/.local/share/calchemy/calchemy.txt` (or
 
 ## Not yet supported
 
-Recurring appointments, natural-language dates (`next friday`), multi-day all-day spans, and JSON output are deliberately left out of this first version.
+Recurring appointments, natural-language dates (`next friday`), and JSON output are deliberately left out of this first version.
 
 ## License
 

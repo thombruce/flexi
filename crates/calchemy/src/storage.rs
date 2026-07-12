@@ -6,6 +6,8 @@ use std::path::Path;
 ///
 /// - `START` is `HH:MM`; absent for an all-day event.
 /// - `END` is `HH:MM` (same day) or `YYYY-MM-DD HH:MM` (crosses to a later day).
+///   With no `START`, a bare `YYYY-MM-DD` END makes a multi-day all-day event
+///   (inclusive last day).
 #[derive(Debug, Clone, PartialEq)]
 pub struct Appt {
     pub date: NaiveDate,
@@ -31,7 +33,15 @@ impl Appt {
 
         let (start, end) = match tokens[1..] {
             [] => (None, None),
-            [s] => (Some(parse_time(s)?), None),
+            [x] => match parse_time(x) {
+                Ok(t) => (Some(t), None),
+                Err(_) => {
+                    let end_date = NaiveDate::parse_from_str(x, "%Y-%m-%d")
+                        .with_context(|| format!("invalid time or end date {:?}", x))?;
+                    anyhow::ensure!(end_date > date, "end date not after start in line: {:?}", line);
+                    (None, Some(end_date.and_time(NaiveTime::MIN)))
+                }
+            },
             [s, e] => {
                 let start = parse_time(s)?;
                 (Some(start), Some(date.and_time(parse_time(e)?)))
@@ -53,6 +63,11 @@ impl Appt {
         self.date.and_time(self.start.unwrap_or(NaiveTime::MIN))
     }
 
+    /// The last calendar day this appointment touches (inclusive).
+    pub fn last_date(&self) -> NaiveDate {
+        self.end.map(|e| e.date()).unwrap_or(self.date)
+    }
+
     /// Renders the canonical storage line for this appointment.
     pub fn to_line(&self) -> String {
         let mut s = self.date.format("%Y-%m-%d").to_string();
@@ -65,6 +80,8 @@ impl Appt {
                     s.push_str(&format!(" {}", end.format("%Y-%m-%d %H:%M")));
                 }
             }
+        } else if let Some(end) = self.end {
+            s.push_str(&format!(" {}", end.format("%Y-%m-%d")));
         }
         format!("{} # {}", s, self.title)
     }
@@ -158,6 +175,21 @@ mod tests {
     }
 
     #[test]
+    fn parse_multi_day_all_day() {
+        let a = Appt::parse("2026-07-17 2026-07-20 # Wedding").unwrap();
+        assert_eq!(a.start, None);
+        assert_eq!(a.end.unwrap(), NaiveDate::from_ymd_opt(2026, 7, 20).unwrap().and_time(NaiveTime::MIN));
+        assert_eq!(a.last_date(), NaiveDate::from_ymd_opt(2026, 7, 20).unwrap());
+        assert_eq!(a.title, "Wedding");
+    }
+
+    #[test]
+    fn parse_rejects_end_date_not_after_start() {
+        assert!(Appt::parse("2026-07-17 2026-07-17 # x").is_err());
+        assert!(Appt::parse("2026-07-17 2026-07-16 # x").is_err());
+    }
+
+    #[test]
     fn parse_rejects_missing_title() {
         assert!(Appt::parse("2026-07-14 09:00").is_err());
         assert!(Appt::parse("2026-07-14 09:00 # ").is_err());
@@ -175,6 +207,7 @@ mod tests {
             "2026-07-14 09:00 # Team sync",
             "2026-07-14 09:00 10:00 # Dentist @clinic",
             "2026-07-14 20:00 2026-07-15 02:00 # Party",
+            "2026-07-17 2026-07-20 # Wedding",
         ] {
             assert_eq!(Appt::parse(line).unwrap().to_line(), line);
         }

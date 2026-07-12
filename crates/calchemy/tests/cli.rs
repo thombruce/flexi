@@ -45,6 +45,31 @@ fn add_writes_canonical_lines() {
 }
 
 #[test]
+fn multi_day_all_day_spans() {
+    let dir = tempdir().unwrap();
+    // Started yesterday, ends tomorrow: ongoing.
+    calchemy(&["add", &day(-1), &day(1), "Wedding"], dir.path()).success();
+    let log = read_log(dir.path());
+    assert!(log.contains(&format!("{} {} # Wedding", day(-1), day(1))), "{log}");
+    // Shows in today's agenda, the default list, and week — despite starting in the past.
+    for args in [vec![], vec!["list"], vec!["week"]] {
+        let o = out(calchemy(&args, dir.path()));
+        assert!(o.contains("Wedding"), "{args:?}: {o}");
+    }
+    // Not in --past while ongoing.
+    let past = out(calchemy(&["list", "--past"], dir.path()));
+    assert!(!past.contains("Wedding"), "{past}");
+}
+
+#[test]
+fn add_rejects_end_date_not_after_start() {
+    let dir = tempdir().unwrap();
+    calchemy(&["add", "2026-07-17", "2026-07-16", "Backwards"], dir.path())
+        .failure()
+        .stderr(predicates::str::contains("must be after"));
+}
+
+#[test]
 fn add_requires_title() {
     let dir = tempdir().unwrap();
     calchemy(&["add", "2026-07-14", "09:00"], dir.path())
