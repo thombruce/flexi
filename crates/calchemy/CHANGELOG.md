@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.3.0] - 2026-07-12
+
 ### Added
 
 - `calchemy add <date> HH:MM <end-date> HH:MM <title>` adds a timed appointment ending on a later day (previously the `YYYY-MM-DD HH:MM` end form was hand-edit only). The end must be after the start.
