@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.0] - 2026-07-26
+
 ### Added
 
 - Initial release. A plaintext contacts / rolodex, one contact per line: `NAME [phone:VALUE]... [email:VALUE]...` (e.g. `John Smith phone:555-123-4567 email:john@example.com`), sorted alphabetically by name and hand-editable. `phone:`/`email:` tokens can appear anywhere in the line and are extracted (multiple allowed per contact); unreserved `+project`/`@context`/other `key:value` tags stay embedded in the name untouched, same convention as bagg/calchemy.
