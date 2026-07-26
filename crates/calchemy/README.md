@@ -50,6 +50,7 @@ calchemy list --month                 # the current calendar month (full month)
 calchemy list --since 2026-07-01 --until 2026-07-31  # a date range
 calchemy list --all                   # include past appointments
 calchemy list --past                  # only past appointments
+calchemy list @clinic                 # only appointments tagged @clinic
 calchemy today                        # shortcut for `list --today`
 calchemy week                         # shortcut for `list --week`
 calchemy rm 2                         # remove appointment #2 as shown by `list`
@@ -65,6 +66,8 @@ An appointment spanning several days appears on every day it covers — a multi-
 Appointments are always listed in chronological order regardless of their order in the file; all-day events sort before timed ones on the same day. `list` shows upcoming appointments (today onward) by default — use `--all`, `--past`, or a date filter to see others. Unlike flexi/clocking's backward-looking logs, `--week` and `--month` show the **whole** calendar week/month, including future days.
 
 `rm <n>` removes the appointment at position `n` in the default `list` view (upcoming, chronological). For anything more involved, `calchemy edit` opens the raw file.
+
+`list` also takes `+project`, `@context`, or `key:value` tag queries (e.g. `calchemy list @clinic`), matched case-insensitively against tags embedded anywhere in the title — multiple queries match if the appointment carries any of them. Tags aren't a separate stored field; they're plain words in `TITLE`, parsed on the fly when filtering. A `key:value` token only counts as a tag when the key starts with a letter, so an ordinary time like `10:00` sitting in a title is never misread as one.
 
 ## Storage format
 

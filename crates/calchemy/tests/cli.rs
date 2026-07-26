@@ -202,6 +202,18 @@ fn empty_states() {
 }
 
 #[test]
+fn list_filters_by_tag() {
+    let dir = tempdir().unwrap();
+    write_log(dir.path(), &format!("{} Dentist @clinic\n{} Standup\n", day(1), day(1)));
+    let tagged = out(calchemy(&["list", "@clinic"], dir.path()));
+    assert!(tagged.contains("Dentist"), "{tagged}");
+    assert!(!tagged.contains("Standup"), "{tagged}");
+    // Case-insensitive.
+    let upper = out(calchemy(&["list", "@CLINIC"], dir.path()));
+    assert!(upper.contains("Dentist"), "{upper}");
+}
+
+#[test]
 fn completions_and_man_smoke() {
     let dir = tempdir().unwrap();
     assert!(out(calchemy(&["completions", "bash"], dir.path())).contains("calchemy"));

@@ -89,3 +89,19 @@ fn list_filters_keep_original_index() {
     // renumbering to 1 within the filtered subset.
     assert!(got.contains("3  x Bread"), "{got}");
 }
+
+#[test]
+fn list_filters_by_tag() {
+    let dir = tempdir().unwrap();
+    bagg(&["add", "Screws", "+kitchen-reno"], dir.path()).success();
+    bagg(&["add", "Milk"], dir.path()).success();
+    let tagged = out(bagg(&["list", "+kitchen-reno"], dir.path()));
+    assert!(tagged.contains("Screws"), "{tagged}");
+    assert!(!tagged.contains("Milk"), "{tagged}");
+    // Case-insensitive.
+    let upper = out(bagg(&["list", "+KITCHEN-RENO"], dir.path()));
+    assert!(upper.contains("Screws"), "{upper}");
+    // Multiple queries match ANY.
+    let either = out(bagg(&["list", "+other", "+kitchen-reno"], dir.path()));
+    assert!(either.contains("Screws"), "{either}");
+}

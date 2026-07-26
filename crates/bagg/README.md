@@ -44,6 +44,7 @@ bagg add --priority A --price 12.99 --qty 2 "Widget thing"
 bagg list                              # everything, sorted (alias for bare invocation)
 bagg list --pending                    # only not-got items
 bagg list --got                        # only got items
+bagg list +kitchen-reno                # only items tagged +kitchen-reno
 bagg got 2                             # toggle got/not-got for item #2 as shown by `list`
 bagg rm 2                              # remove item #2 as shown by `list`
 bagg edit                              # open the list file in $EDITOR
@@ -52,6 +53,8 @@ bagg man                               # print the man page (roff) to stdout
 ```
 
 Items are always listed sorted, regardless of their order in the file: not-got before got, then priority `A` before `B` before none, then cheapest price before priciest before unpriced. `list --pending`/`--got` filter that same sorted listing without renumbering it — an item keeps the index it has in the full list even when a filter hides its neighbors, so `got`/`rm` always target what you expect.
+
+`list` also takes `+project`, `@context`, or `key:value` tag queries (e.g. `bagg list +kitchen-reno @tesco`), matched case-insensitively against tags embedded anywhere in an item's name — multiple queries match if the item carries any of them. Tags aren't a separate stored field; they're plain words in `NAME` (`Screws +kitchen-reno`), parsed on the fly when filtering, todo.txt's own convention. This is also the answer to "how do I group related items" (e.g. several parts for one project) — tag them all with the same `+project`, no nesting needed.
 
 ## Storage format
 
@@ -87,7 +90,7 @@ Without config, the list lives at `~/.local/share/bagg/bagg.txt` (or the platfor
 
 ## Not yet supported
 
-Notes/links as structured fields (they live in the free-text name instead), categories/tags, and JSON output are deliberately left out of this first version.
+Notes/links as structured fields (they live in the free-text name instead, alongside `+project`/`@context`/`key:value` tags) and JSON output are deliberately left out of this first version.
 
 ## License
 
