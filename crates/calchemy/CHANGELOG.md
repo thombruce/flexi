@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.5.0] - 2026-07-26
+
 ### Added
 
 - `calchemy list` now takes `+project`/`@context`/`key:value` tag queries (e.g. `calchemy list @clinic`), matched case-insensitively against tags embedded in the title; multiple queries match if an appointment carries ANY of them. A `key:value` token only counts as a tag when the key starts with a letter, so a bare time like `10:00` in a title is never misread as one. Tags aren't a stored field — parsed on the fly from the existing free-text `TITLE`.
