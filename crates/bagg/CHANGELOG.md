@@ -9,9 +9,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-- Locale-aware price formatting: new `decimal_separator` (default `.`) and `decimal_places` (default `2`) config keys let PRICE match your own convention (e.g. `12,99`, or a whole-unit `1500` for JPY-style currencies with `decimal_places = 0`).
-- A `?` placeholder for "price deliberately unspecified" — occupies the PRICE slot without being a real value. Mainly relevant with `decimal_places = 0`, where a priceless item whose name opens with a bare number (`4 slice toaster`) would otherwise misparse as a priced item; `to_line` now auto-inserts `?` whenever omitting it would make the name misparse on the next read, and leaves the common case (`Eggs`) untouched otherwise. `--price ?` is also accepted on `add`.
-- `always_show_unspecified_price` config key (default `false`) to always show `?` on priceless items rather than only when needed to disambiguate.
+- Locale-aware price formatting: new `decimal_separator` (default `.`) and `decimal_places` (default `2`, must be `<= 9`) config keys let PRICE match your own convention (e.g. `12,99`, or a whole-unit `1500` for JPY-style currencies with `decimal_places = 0`). Invalid separators (alphanumeric, whitespace, or `( ) ?`) and out-of-range decimal places are rejected at config load.
+- A `?` placeholder for "price deliberately unspecified" — occupies the PRICE slot without being a real value. Only relevant with `decimal_places = 0`, the one config where a priceless item whose name opens with a bare number (`4 slice toaster`) would otherwise misparse as a priced item; `to_line` now auto-inserts `?` whenever omitting it would make the name misparse on the next read, and leaves the common case (`Eggs`) untouched otherwise. `--price ?` is also accepted on `add`. Under any other `decimal_places`, `?` is never recognized or written — a name genuinely starting with `?` is left untouched rather than silently eaten.
+- `always_show_unspecified_price` config key (default `false`) to always show `?` on priceless items rather than only when needed to disambiguate; only takes effect under `decimal_places = 0`, same as the placeholder itself.
 
 ## [0.2.0] - 2026-07-26
 

@@ -19,6 +19,11 @@ impl Default for PriceFormat {
 /// Explicit "price unspecified" token — occupies the PRICE slot positionally
 /// without being a real value, so a NAME that itself starts with a number
 /// (only possible when `places == 0`) can still be told apart from PRICE.
+///
+/// Only recognized (on read) and ever written (on write) when `places == 0`
+/// — that's the only config where a bare leading number is even ambiguous
+/// with PRICE. Under any other config a leading `?` is never touched: it's
+/// ordinary name text, preserved literally rather than silently eaten.
 pub const UNSPECIFIED_PRICE: &str = "?";
 
 /// One item, parsed from a line `[x ][(A) ][PRICE ]NAME[ xQTY]`.
@@ -63,7 +68,7 @@ impl Item {
             tokens.remove(0);
         }
 
-        let price = if tokens.first() == Some(&UNSPECIFIED_PRICE) {
+        let price = if fmt.places == 0 && tokens.first() == Some(&UNSPECIFIED_PRICE) {
             tokens.remove(0);
             None
         } else if let Some(p) = tokens.first().and_then(|t| parse_price(t, fmt)) {
@@ -94,10 +99,11 @@ impl Item {
     }
 
     /// Renders the canonical storage line for this item. When there's no
-    /// price, `?` is written only if omitting it would let the name's
-    /// leading word be misread as a price on re-read (or always, if
-    /// `always_show_unspecified_price` is set) — the common case (`Eggs`)
-    /// stays untouched.
+    /// price and `fmt.places == 0`, `?` is written only if omitting it
+    /// would let the name's leading word be misread as a price on re-read
+    /// (or always, if `always_show_unspecified_price` is set) — the common
+    /// case (`Eggs`) stays untouched. Under any other `places`, `?` is
+    /// never written — there's no collision it would need to guard against.
     pub fn to_line(&self, fmt: PriceFormat, always_show_unspecified_price: bool) -> String {
         let mut parts = Vec::new();
         if self.got {
@@ -108,13 +114,14 @@ impl Item {
         }
         match self.price {
             Some(cents) => parts.push(format_price(cents, fmt)),
-            None => {
+            None if fmt.places == 0 => {
                 let name_would_collide =
                     self.name.split_whitespace().next().is_some_and(|first| parse_price(first, fmt).is_some());
                 if always_show_unspecified_price || name_would_collide {
                     parts.push(UNSPECIFIED_PRICE.to_string());
                 }
             }
+            None => {}
         }
         parts.push(self.name.clone());
         if self.qty != 1 {
@@ -375,9 +382,22 @@ mod tests {
 
     #[test]
     fn unspecified_price_placeholder_parses_as_no_price() {
-        let i = item("? Eggs");
+        // Only meaningful under places == 0 — the only config where a bare
+        // leading token could otherwise be misread as PRICE.
+        let fmt = PriceFormat { separator: '.', places: 0 };
+        let i = Item::parse("? Eggs", fmt).unwrap();
         assert_eq!(i.price, None);
         assert_eq!(i.name, "Eggs");
+    }
+
+    #[test]
+    fn placeholder_not_recognized_when_places_nonzero() {
+        // Under the default config there's no digit-leading collision to
+        // guard against, so a leading `?` is just ordinary name text —
+        // preserved literally, not silently eaten.
+        let i = item("? Eggs");
+        assert_eq!(i.price, None);
+        assert_eq!(i.name, "? Eggs");
     }
 
     #[test]
@@ -415,6 +435,16 @@ mod tests {
     #[test]
     fn always_show_unspecified_price_forces_placeholder() {
         let i = Item { got: false, priority: None, price: None, qty: 1, name: "Eggs".to_string(), raw: String::new() };
-        assert_eq!(i.to_line(PriceFormat::default(), true), "? Eggs");
+        let fmt = PriceFormat { separator: '.', places: 0 };
+        assert_eq!(i.to_line(fmt, true), "? Eggs");
+    }
+
+    #[test]
+    fn always_show_unspecified_price_is_noop_when_places_nonzero() {
+        // `?` is never written under places > 0 -- there's no config where
+        // recognizing it back on read would be meaningful, so writing it
+        // would just corrupt the name on the next round-trip.
+        let i = Item { got: false, priority: None, price: None, qty: 1, name: "Eggs".to_string(), raw: String::new() };
+        assert_eq!(i.to_line(PriceFormat::default(), true), "Eggs");
     }
 }
