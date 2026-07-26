@@ -5,10 +5,16 @@ use std::path::PathBuf;
 #[derive(Deserialize, Default)]
 struct RawConfig {
     pub path: Option<PathBuf>,
+    pub decimal_separator: Option<char>,
+    pub decimal_places: Option<u32>,
+    pub always_show_unspecified_price: Option<bool>,
 }
 
 pub struct ResolvedConfig {
     pub path: PathBuf,
+    pub decimal_separator: char,
+    pub decimal_places: u32,
+    pub always_show_unspecified_price: bool,
 }
 
 pub fn resolve() -> Result<ResolvedConfig> {
@@ -21,7 +27,19 @@ pub fn resolve() -> Result<ResolvedConfig> {
         data_dir.join("bagg").join("bagg.txt")
     };
 
-    Ok(ResolvedConfig { path })
+    let decimal_separator = raw.decimal_separator.unwrap_or('.');
+    anyhow::ensure!(
+        !decimal_separator.is_ascii_alphanumeric() && !matches!(decimal_separator, '(' | ')' | '?'),
+        "invalid decimal_separator {:?}: must not be alphanumeric or one of ( ) ?",
+        decimal_separator
+    );
+
+    Ok(ResolvedConfig {
+        path,
+        decimal_separator,
+        decimal_places: raw.decimal_places.unwrap_or(2),
+        always_show_unspecified_price: raw.always_show_unspecified_price.unwrap_or(false),
+    })
 }
 
 fn load_config() -> Result<RawConfig> {

@@ -6,7 +6,7 @@ use anyhow::{Context, Result};
 use clap::{Args, CommandFactory, Parser, Subcommand};
 use clap_complete::{generate, Shell};
 use owo_colors::{OwoColorize, Stream::Stdout};
-use storage::Item;
+use storage::{Item, PriceFormat};
 
 #[derive(Parser)]
 #[command(name = "bagg", version, about = "A plaintext shopping list / wishlist")]
@@ -19,9 +19,9 @@ struct Cli {
 enum Commands {
     /// Add an item: `add [--price 12.99] [--qty N] [--priority A-Z] <name...>`
     Add {
-        /// Price, e.g. `12.99`
-        #[arg(long, short = 'p', value_parser = parse_price_arg)]
-        price: Option<i32>,
+        /// Price, e.g. `12.99`, or `?` for deliberately unspecified
+        #[arg(long, short = 'p')]
+        price: Option<String>,
         /// Quantity desired (default 1)
         #[arg(long, short = 'q')]
         qty: Option<u32>,
@@ -70,10 +70,6 @@ struct ItemFilter {
     got: bool,
 }
 
-fn parse_price_arg(s: &str) -> Result<i32, String> {
-    storage::parse_price(s).ok_or_else(|| format!("invalid price {:?}, expected e.g. 12.99", s))
-}
-
 fn parse_priority_arg(s: &str) -> Result<char, String> {
     let mut chars = s.chars();
     match (chars.next(), chars.next()) {
@@ -85,22 +81,22 @@ fn parse_priority_arg(s: &str) -> Result<char, String> {
 /// All items, sorted by status/priority/price. Indices used by `got`/`rm`
 /// are positions in this list, so filtered `list` views keep their
 /// original index rather than renumbering the visible subset.
-fn all_sorted(cfg: &config::ResolvedConfig) -> Result<Vec<Item>> {
-    let mut items = storage::read_items(&cfg.path)?;
+fn all_sorted(cfg: &config::ResolvedConfig, fmt: PriceFormat) -> Result<Vec<Item>> {
+    let mut items = storage::read_items(&cfg.path, fmt)?;
     items.sort_by_key(|i| i.sort_key());
     Ok(items)
 }
 
-fn find_item(cfg: &config::ResolvedConfig, index: usize) -> Result<Item> {
-    let items = all_sorted(cfg)?;
+fn find_item(cfg: &config::ResolvedConfig, fmt: PriceFormat, index: usize) -> Result<Item> {
+    let items = all_sorted(cfg, fmt)?;
     index
         .checked_sub(1)
         .and_then(|i| items.get(i).cloned())
         .with_context(|| format!("no item {} — run `bagg list`", index))
 }
 
-fn run_list(cfg: &config::ResolvedConfig, filter: &ItemFilter, tag_queries: &[String]) -> Result<()> {
-    let items = all_sorted(cfg)?;
+fn run_list(cfg: &config::ResolvedConfig, fmt: PriceFormat, filter: &ItemFilter, tag_queries: &[String]) -> Result<()> {
+    let items = all_sorted(cfg, fmt)?;
     if items.is_empty() {
         println!("list is empty");
         return Ok(());
@@ -117,7 +113,7 @@ fn run_list(cfg: &config::ResolvedConfig, filter: &ItemFilter, tag_queries: &[St
             continue;
         }
         let n = format!("{:>width$}", i + 1, width = width);
-        let line = item.to_line();
+        let line = item.to_line(fmt, cfg.always_show_unspecified_price);
         let line = if item.got { line.if_supports_color(Stdout, |t| t.dimmed()).to_string() } else { line };
         println!("{}  {}", n.if_supports_color(Stdout, |t| t.dimmed()), line);
     }
@@ -139,30 +135,38 @@ fn main() -> Result<()> {
     }
 
     let cfg = config::resolve()?;
+    let fmt = PriceFormat { separator: cfg.decimal_separator, places: cfg.decimal_places };
 
     match cli.command {
-        None => run_list(&cfg, &ItemFilter { pending: false, got: false }, &[])?,
-        Some(Commands::List { filter, tags }) => run_list(&cfg, &filter, &tags)?,
+        None => run_list(&cfg, fmt, &ItemFilter { pending: false, got: false }, &[])?,
+        Some(Commands::List { filter, tags }) => run_list(&cfg, fmt, &filter, &tags)?,
         Some(Commands::Add { price, qty, priority, name }) => {
             let name = name.join(" ");
             anyhow::ensure!(!name.trim().is_empty(), "an item needs a name");
             anyhow::ensure!(!name.contains(['\n', '\r']), "name must not contain newlines");
+            let price = match price.as_deref() {
+                None | Some(storage::UNSPECIFIED_PRICE) => None,
+                Some(s) => Some(storage::parse_price(s, fmt).with_context(|| {
+                    format!("invalid price {:?}, expected e.g. {}", s, storage::format_price(1234, fmt))
+                })?),
+            };
             let item = Item { got: false, priority, price, qty: qty.unwrap_or(1), name, raw: String::new() };
-            storage::append_item(&cfg.path, &item)?;
-            println!("added: {}", item.to_line());
+            let line = item.to_line(fmt, cfg.always_show_unspecified_price);
+            storage::append_item(&cfg.path, &line)?;
+            println!("added: {}", line);
         }
         Some(Commands::Got { index }) => {
-            let mut item = find_item(&cfg, index)?;
+            let mut item = find_item(&cfg, fmt, index)?;
             let old_raw = item.raw.clone();
             item.got = !item.got;
-            let new_line = item.to_line();
+            let new_line = item.to_line(fmt, cfg.always_show_unspecified_price);
             storage::replace_line(&cfg.path, &old_raw, &new_line)?;
             println!("{}: {}", if item.got { "got" } else { "want" }, new_line);
         }
         Some(Commands::Rm { index }) => {
-            let item = find_item(&cfg, index)?;
+            let item = find_item(&cfg, fmt, index)?;
             storage::remove_line(&cfg.path, &item.raw)?;
-            println!("removed: {}", item.to_line());
+            println!("removed: {}", item.to_line(fmt, cfg.always_show_unspecified_price));
         }
         Some(Commands::Edit) => {
             let editor = std::env::var("EDITOR").unwrap_or_else(|_| "vi".to_string());

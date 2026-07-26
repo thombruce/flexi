@@ -72,11 +72,24 @@ Each line is `[x ][(A) ][PRICE ]NAME[ xQTY]`:
 
 - A leading `x` marks the item as got (todo.txt convention); absent means not-got. No placeholder token is needed for "not got".
 - `(A)`–`(Z)` is an optional priority. Unbounded — there's no fixed set of levels, and no priority sorts after any lettered one.
-- `PRICE` is an optional decimal amount, always written with a `.` (e.g. `12.99`, `0.99`) — that's what lets it be told apart from a bare integer, which is never a price.
+- `PRICE` is an optional decimal amount, or the literal `?` for "deliberately unspecified". By default it's written with a `.` and 2 decimal places (e.g. `12.99`) — that's what lets it be told apart from a bare integer, which is never a price. Both the separator and the decimal-place count are configurable (see Configuration) for other locales/currencies.
 - `NAME` is required free text — a URL, a store name, a note, all just live in the name itself.
 - A trailing `xN` tag (e.g. `x3`) is the desired quantity; omitted entirely when it's `1`, so the common case (`Eggs`) stays a single plain word.
 
-Unlike calchemy's `DATE ... # TITLE`, there's no `#` delimiter — bagg's format is fully todo.txt-native: leading status/priority markers, a trailing inline tag. This means parsing leans on token shape at both ends of the line: a name that starts with a bare `12.99`-shaped word, or ends in a word shaped like `x3`, will be misread as a price or quantity tag rather than plain text. This is a deliberate, accepted tradeoff for a shopping list (rare in practice) rather than something worth an escaping scheme.
+Unlike calchemy's `DATE ... # TITLE`, there's no `#` delimiter — bagg's format is fully todo.txt-native: leading status/priority markers, a trailing inline tag. This means parsing leans on token shape at both ends of the line: a name that starts with a bare price-shaped word, or ends in a word shaped like `x3`, will be misread as a price or quantity tag rather than plain text. This is a deliberate, accepted tradeoff for a shopping list (rare in practice) rather than something worth an escaping scheme — with one exception (below) that's worth knowing about if you set `decimal_places = 0`.
+
+### Price placeholder and locale config
+
+Currency isn't tracked at all (no symbol/code) — `PRICE` is just a bare number in your own convention. Two config keys adjust its shape:
+
+```toml
+decimal_separator = ","   # default "."
+decimal_places = 0        # default 2 — set 0 for whole-unit currencies like JPY
+```
+
+With `decimal_places = 0`, a price is a bare integer (`1500`), which means it can collide with a NAME that itself opens with a number ("4 slice toaster") *when no price is given* — `bagg add "4 slice toaster"` would otherwise be indistinguishable from a price of 4. This is why the literal `?` placeholder exists: it occupies the PRICE slot to mean "unspecified" without being a real value, so `? 4 slice toaster` parses correctly regardless of decimal-place config. You rarely need to type it yourself — `to_line` (what `add`/`got`/`rm` all write through) automatically inserts `?` whenever omitting it would make the name misparse as a price on the next read, and leaves priceless items exactly as clean as before (`Eggs` stays `Eggs`) when there's no risk of collision. Set `always_show_unspecified_price = true` if you'd simply prefer every priceless item to visibly carry `?`, not just the ones that need it.
+
+Note this only ever bites a **priceless** item whose name opens with a bare number — as soon as an actual price is present, it always claims exactly the first token, so `bagg add --price 1500 "4 slice toaster"` is unambiguous regardless of config.
 
 ## Configuration
 
@@ -84,6 +97,9 @@ Create `~/.config/bagg/bagg.toml`:
 
 ```toml
 path = "/path/to/bagg.txt"
+decimal_separator = "."    # default "."
+decimal_places = 2         # default 2
+always_show_unspecified_price = false   # default false
 ```
 
 Without config, the list lives at `~/.local/share/bagg/bagg.txt` (or the platform equivalent).

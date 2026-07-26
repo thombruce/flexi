@@ -17,6 +17,11 @@ fn write_log(dir: &Path, content: &str) {
     fs::write(dir.join("bagg").join("bagg.txt"), content).unwrap();
 }
 
+fn write_config(dir: &Path, content: &str) {
+    fs::create_dir_all(dir.join("bagg")).unwrap();
+    fs::write(dir.join("bagg").join("bagg.toml"), content).unwrap();
+}
+
 fn read_log(dir: &Path) -> String {
     fs::read_to_string(dir.join("bagg").join("bagg.txt")).unwrap()
 }
@@ -120,4 +125,46 @@ fn tag_filter_composes_as_and_with_other_filters() {
     let got_tagged = out(bagg(&["list", "--got", "+kitchen-reno"], dir.path()));
     assert!(got_tagged.contains("Screws"), "{got_tagged}");
     assert!(!got_tagged.contains("Paint"), "{got_tagged}");
+}
+
+#[test]
+fn comma_decimal_separator_config() {
+    let dir = tempdir().unwrap();
+    write_config(dir.path(), "decimal_separator = \",\"\n");
+    bagg(&["add", "--price", "12,99", "Widget"], dir.path()).success();
+    bagg(&["add", "--price", "12.99", "Should fail"], dir.path()).failure();
+    let log = read_log(dir.path());
+    assert!(log.contains("12,99 Widget"), "{log}");
+}
+
+#[test]
+fn zero_decimal_places_auto_placeholder() {
+    let dir = tempdir().unwrap();
+    write_config(dir.path(), "decimal_places = 0\n");
+    bagg(&["add", "--price", "1500", "Ramen bowl"], dir.path()).success();
+    // Priceless item whose name starts with a bare number: to_line must
+    // auto-insert `?` so the file stays safely re-parseable.
+    bagg(&["add", "4 slice toaster"], dir.path()).success();
+    let log = read_log(dir.path());
+    assert!(log.contains("1500 Ramen bowl"), "{log}");
+    assert!(log.contains("? 4 slice toaster"), "{log}");
+    let listing = out(bagg(&["list"], dir.path()));
+    assert!(listing.contains("4 slice toaster"), "{listing}");
+}
+
+#[test]
+fn explicit_unspecified_price_flag() {
+    let dir = tempdir().unwrap();
+    bagg(&["add", "--price", "?", "Mystery item"], dir.path()).success();
+    let log = read_log(dir.path());
+    // No collision risk under the default config, so the placeholder isn't
+    // written back — the common case stays plain text.
+    assert_eq!(log.trim(), "Mystery item");
+}
+
+#[test]
+fn invalid_decimal_separator_config_rejected() {
+    let dir = tempdir().unwrap();
+    write_config(dir.path(), "decimal_separator = \"x\"\n");
+    bagg(&["list"], dir.path()).failure().stderr(predicates::str::contains("invalid decimal_separator"));
 }
