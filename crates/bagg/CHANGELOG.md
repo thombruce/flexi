@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.3.0] - 2026-07-26
+
 ### Added
 
 - Locale-aware price formatting: new `decimal_separator` (default `.`) and `decimal_places` (default `2`, must be `<= 9`) config keys let PRICE match your own convention (e.g. `12,99`, or a whole-unit `1500` for JPY-style currencies with `decimal_places = 0`). Invalid separators (alphanumeric, whitespace, or `( ) ?`) and out-of-range decimal places are rejected at config load.
