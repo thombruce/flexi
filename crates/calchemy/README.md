@@ -71,21 +71,21 @@ Appointments are always listed in chronological order regardless of their order 
 The calendar is a plaintext file, one appointment per line, hand-editable:
 
 ```
-2026-12-25 # Christmas
-2026-07-14 09:00 # Standup
-2026-07-14 09:00 10:00 # Dentist @clinic
-2026-07-14 20:00 2026-07-15 02:00 # Party
-2026-07-17 2026-07-20 # Wedding
+2026-12-25 Christmas
+2026-07-14 09:00 Standup
+2026-07-14 09:00 10:00 Dentist @clinic
+2026-07-14 20:00 2026-07-15 02:00 Party
+2026-07-17 2026-07-20 Wedding
 ```
 
-Each line is `DATE [START [END]] # TITLE`:
+Each line is `DATE [START [END]] TITLE` — no delimiter between the machine fields and the title, todo.txt-native like bagg (unlike flexi/clocking's ` # note` convention):
 
 - `DATE` is `YYYY-MM-DD` and always leads the line, so the file greps and sorts chronologically.
 - `START` is `HH:MM`; omit it for an all-day event.
 - `END` is `HH:MM` for a same-day finish, or `YYYY-MM-DD HH:MM` when the appointment runs into a later day. With no `START`, a bare `YYYY-MM-DD` end makes a multi-day all-day event (inclusive last day; must be after `DATE`).
-- Everything after ` # ` is the title (free text; `@location` and `+tag` conventions can live inside it).
+- Everything left over after the leading date/time fields are claimed is the title (free text; `@location` and `+tag` conventions can live inside it).
 
-The ` # ` separator matches the note convention in flexi and clocking — machine-readable fields before it, human text after.
+Parsing is shape-based, not delimiter-based: the longest matching prefix of leading date/time-shaped tokens is claimed greedily, and whatever's left becomes the title. Accepted tradeoff: a title that itself opens with a well-formed date or time (e.g. "09:00 sync") can have those leading words misclaimed as `START`/`END` rather than title text — rare in practice, not worth an escaping scheme. Files written with the older ` # ` delimiter still read fine; the `#` just ends up as a stray leading character in the title until the line is re-saved.
 
 ## Configuration
 

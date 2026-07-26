@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- Dropped the ` # ` delimiter — lines are now `DATE [START [END]] TITLE`, fully todo.txt-native like bagg, no explicit separator between machine fields and the title. Parsing is shape-based: the longest matching prefix of leading date/time-shaped tokens is claimed greedily, and whatever's left is the title. Old files with `#` still parse without error — the `#` just becomes a leading stray character in the title (e.g. `2026-12-25 # Christmas` reads as title `# Christmas`) — no migration required, though re-saving via `edit` or a fresh `add` will drop it.
+- Accepted tradeoff, documented rather than engineered around: a title that itself opens with well-formed date/time-shaped tokens (e.g. "09:00 sync") can have those leading words misclaimed as `START`/`END` rather than title text.
+
 ## [0.3.0] - 2026-07-12
 
 ### Added

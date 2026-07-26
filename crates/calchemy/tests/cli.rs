@@ -38,10 +38,10 @@ fn add_writes_canonical_lines() {
     calchemy(&["add", "2026-07-14", "09:00-10:00", "Dentist", "@clinic"], dir.path()).success();
     calchemy(&["add", "2026-07-14", "20:00-02:00", "Party"], dir.path()).success();
     let log = read_log(dir.path());
-    assert!(log.contains("2026-12-25 # Christmas"), "{log}");
-    assert!(log.contains("2026-07-14 09:00 # Team sync"), "{log}");
-    assert!(log.contains("2026-07-14 09:00 10:00 # Dentist @clinic"), "{log}");
-    assert!(log.contains("2026-07-14 20:00 2026-07-15 02:00 # Party"), "cross-day end: {log}");
+    assert!(log.contains("2026-12-25 Christmas"), "{log}");
+    assert!(log.contains("2026-07-14 09:00 Team sync"), "{log}");
+    assert!(log.contains("2026-07-14 09:00 10:00 Dentist @clinic"), "{log}");
+    assert!(log.contains("2026-07-14 20:00 2026-07-15 02:00 Party"), "cross-day end: {log}");
 }
 
 #[test]
@@ -50,7 +50,7 @@ fn multi_day_all_day_spans() {
     // Started yesterday, ends tomorrow: ongoing.
     calchemy(&["add", &day(-1), &day(1), "Wedding"], dir.path()).success();
     let log = read_log(dir.path());
-    assert!(log.contains(&format!("{} {} # Wedding", day(-1), day(1))), "{log}");
+    assert!(log.contains(&format!("{} {} Wedding", day(-1), day(1))), "{log}");
     // Shows in today's agenda, the default list, and week — despite starting in the past.
     for args in [vec![], vec!["list"], vec!["week"]] {
         let o = out(calchemy(&args, dir.path()));
@@ -70,9 +70,9 @@ fn add_timed_multi_day() {
     // A date after the start time with no end time belongs to the title.
     calchemy(&["add", "2026-09-01", "09:00", "2026-09-02", "deadline"], dir.path()).success();
     let log = read_log(dir.path());
-    assert!(log.contains("2026-07-17 09:00 2026-07-20 17:00 # Conference"), "{log}");
-    assert!(log.contains("2026-08-01 09:00 10:00 # Sameday"), "{log}");
-    assert!(log.contains("2026-09-01 09:00 # 2026-09-02 deadline"), "{log}");
+    assert!(log.contains("2026-07-17 09:00 2026-07-20 17:00 Conference"), "{log}");
+    assert!(log.contains("2026-08-01 09:00 10:00 Sameday"), "{log}");
+    assert!(log.contains("2026-09-01 09:00 2026-09-02 deadline"), "{log}");
 }
 
 #[test]
@@ -104,7 +104,7 @@ fn bare_shows_today_agenda() {
     let dir = tempdir().unwrap();
     write_log(
         dir.path(),
-        &format!("{} 14:00 # Team sync\n{} 09:00 # Standup\n{} # Future thing\n", day(0), day(0), day(3)),
+        &format!("{} 14:00 Team sync\n{} 09:00 Standup\n{} Future thing\n", day(0), day(0), day(3)),
     );
     let o = out(calchemy(&[], dir.path()));
     assert!(o.contains("(today)"), "{o}");
@@ -118,7 +118,7 @@ fn bare_shows_today_agenda() {
 #[test]
 fn list_default_hides_past() {
     let dir = tempdir().unwrap();
-    write_log(dir.path(), &format!("{} # Past\n{} # Future\n", day(-5), day(2)));
+    write_log(dir.path(), &format!("{} Past\n{} Future\n", day(-5), day(2)));
     let o = out(calchemy(&["list"], dir.path()));
     assert!(o.contains("Future"), "{o}");
     assert!(!o.contains("Past"), "default list is upcoming only: {o}");
@@ -127,7 +127,7 @@ fn list_default_hides_past() {
 #[test]
 fn list_all_and_past_views() {
     let dir = tempdir().unwrap();
-    write_log(dir.path(), &format!("{} # Past\n{} # Future\n", day(-5), day(2)));
+    write_log(dir.path(), &format!("{} Past\n{} Future\n", day(-5), day(2)));
     let all = out(calchemy(&["list", "--all"], dir.path()));
     assert!(all.contains("Past") && all.contains("Future"), "{all}");
     let past = out(calchemy(&["list", "--past"], dir.path()));
@@ -138,7 +138,7 @@ fn list_all_and_past_views() {
 fn next_picks_soonest_upcoming() {
     let dir = tempdir().unwrap();
     // Both timed and future-dated, so independent of the current clock.
-    write_log(dir.path(), &format!("{} 09:00 # Later\n{} 09:00 # Sooner\n", day(3), day(1)));
+    write_log(dir.path(), &format!("{} 09:00 Later\n{} 09:00 Sooner\n", day(3), day(1)));
     let o = out(calchemy(&["next"], dir.path()));
     assert!(o.contains("Sooner"), "{o}");
     assert!(!o.contains("Later"), "{o}");
@@ -148,7 +148,7 @@ fn next_picks_soonest_upcoming() {
 fn week_filter_is_full_week() {
     let dir = tempdir().unwrap();
     // today is always in this week; today+8 never is.
-    write_log(dir.path(), &format!("{} # ThisWeek\n{} # NextWeek\n", day(0), day(8)));
+    write_log(dir.path(), &format!("{} ThisWeek\n{} NextWeek\n", day(0), day(8)));
     let o = out(calchemy(&["week"], dir.path()));
     assert!(o.contains("ThisWeek"), "{o}");
     assert!(!o.contains("NextWeek"), "week is bounded: {o}");
@@ -162,7 +162,7 @@ fn month_filter_is_full_month() {
         .unwrap()
         .format("%Y-%m-%d")
         .to_string();
-    write_log(dir.path(), &format!("{first} # ThisMonth\n{} # NextMonthish\n", day(40)));
+    write_log(dir.path(), &format!("{first} ThisMonth\n{} NextMonthish\n", day(40)));
     let o = out(calchemy(&["list", "--month"], dir.path()));
     assert!(o.contains("ThisMonth"), "{o}");
     assert!(!o.contains("NextMonthish"), "month is bounded: {o}");
@@ -173,7 +173,7 @@ fn rm_by_index_removes_and_preserves_order() {
     let dir = tempdir().unwrap();
     write_log(
         dir.path(),
-        &format!("{} 09:00 # First\n{} 10:00 # Second\n{} 11:00 # Third\n", day(1), day(1), day(1)),
+        &format!("{} 09:00 First\n{} 10:00 Second\n{} 11:00 Third\n", day(1), day(1), day(1)),
     );
     let o = out(calchemy(&["rm", "2"], dir.path()));
     assert!(o.contains("removed:") && o.contains("Second"), "{o}");
@@ -187,7 +187,7 @@ fn rm_by_index_removes_and_preserves_order() {
 #[test]
 fn rm_bad_index_errors() {
     let dir = tempdir().unwrap();
-    write_log(dir.path(), &format!("{} 09:00 # Only\n", day(1)));
+    write_log(dir.path(), &format!("{} 09:00 Only\n", day(1)));
     calchemy(&["rm", "5"], dir.path())
         .failure()
         .stderr(predicates::str::contains("no appointment 5"));
