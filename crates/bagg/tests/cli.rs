@@ -168,3 +168,17 @@ fn invalid_decimal_separator_config_rejected() {
     write_config(dir.path(), "decimal_separator = \"x\"\n");
     bagg(&["list"], dir.path()).failure().stderr(predicates::str::contains("invalid decimal_separator"));
 }
+
+#[test]
+fn whitespace_decimal_separator_config_rejected() {
+    let dir = tempdir().unwrap();
+    write_config(dir.path(), "decimal_separator = \" \"\n");
+    bagg(&["list"], dir.path()).failure().stderr(predicates::str::contains("invalid decimal_separator"));
+}
+
+#[test]
+fn out_of_range_decimal_places_config_rejected() {
+    let dir = tempdir().unwrap();
+    write_config(dir.path(), "decimal_places = 10\n");
+    bagg(&["list"], dir.path()).failure().stderr(predicates::str::contains("invalid decimal_places"));
+}
