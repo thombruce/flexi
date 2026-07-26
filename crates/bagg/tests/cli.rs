@@ -163,17 +163,11 @@ fn explicit_unspecified_price_flag() {
 }
 
 #[test]
-fn question_mark_leading_name_survives_round_trip_under_default_config() {
+fn always_show_unspecified_price_works_under_decimal_config() {
     let dir = tempdir().unwrap();
-    // Under the default config, `?` has no disambiguating job to do, so it
-    // must not be silently eaten from a name that genuinely starts with one.
-    write_log(dir.path(), "? Kidding, no idea what to get\n");
-    let listing = out(bagg(&["list"], dir.path()));
-    assert!(listing.contains("? Kidding, no idea what to get"), "{listing}");
-    // A no-op round-trip through got/rm shouldn't alter it either.
-    bagg(&["got", "1"], dir.path()).success();
-    bagg(&["got", "1"], dir.path()).success();
-    assert_eq!(read_log(dir.path()).trim(), "? Kidding, no idea what to get");
+    write_config(dir.path(), "always_show_unspecified_price = true\n");
+    bagg(&["add", "Eggs"], dir.path()).success();
+    assert_eq!(read_log(dir.path()).trim(), "? Eggs");
 }
 
 #[test]

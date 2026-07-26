@@ -17,13 +17,13 @@ impl Default for PriceFormat {
 }
 
 /// Explicit "price unspecified" token — occupies the PRICE slot positionally
-/// without being a real value, so a NAME that itself starts with a number
-/// (only possible when `places == 0`) can still be told apart from PRICE.
-///
-/// Only recognized (on read) and ever written (on write) when `places == 0`
-/// — that's the only config where a bare leading number is even ambiguous
-/// with PRICE. Under any other config a leading `?` is never touched: it's
-/// ordinary name text, preserved literally rather than silently eaten.
+/// without being a real value, so a NAME that itself opens with a
+/// PRICE-shaped token can still be told apart from a real price, and so a
+/// price can be deliberately marked unknown under any `PriceFormat`, not
+/// just `places == 0`. Recognized on read and can be written on write
+/// (auto-emitted by `Item::to_line` when needed, or always via
+/// `always_show_unspecified_price`) regardless of `places` — the collision
+/// it guards against isn't specific to bare integers (see `Item` docs).
 pub const UNSPECIFIED_PRICE: &str = "?";
 
 /// One item, parsed from a line `[x ][(A) ][PRICE ]NAME[ xQTY]`.
@@ -31,11 +31,15 @@ pub const UNSPECIFIED_PRICE: &str = "?";
 /// - Leading `x` marks the item as got; absent means not-got.
 /// - `(A)`-`(Z)` is an optional priority.
 /// - `PRICE` is an optional decimal amount (e.g. `12.99`), stored in minor
-///   units (cents), or the literal `?` for "unspecified". With `places > 0`
-///   the required separator is what distinguishes a price token from a bare
-///   integer (never a price on its own); with `places == 0` a price is a
-///   bare integer, which can then collide with a NAME that itself opens
-///   with a number — `?` exists specifically to disambiguate that case.
+///   units (cents), or the literal `?` for "unspecified". A NAME whose
+///   leading token happens to fully match the current `PriceFormat` shape
+///   (any `places`, e.g. "1.99 and the Psychology of Pricing" under the
+///   default `.`/2 places, not just a bare integer under `places == 0`)
+///   collides with PRICE the same way it always has in this format —
+///   accepted, documented, same tier as the other shape-based tradeoffs
+///   below, not something `?` was ever meant to eliminate entirely. What
+///   `?` *does* let you do: mark a price as deliberately unspecified even
+///   when there'd be no collision otherwise, under any locale config.
 /// - `NAME` is required free text.
 /// - A trailing `xN` token (e.g. `x3`) is the desired quantity; absent means 1.
 ///   `to_line` omits it when the quantity is 1, so the common case
@@ -68,7 +72,7 @@ impl Item {
             tokens.remove(0);
         }
 
-        let price = if fmt.places == 0 && tokens.first() == Some(&UNSPECIFIED_PRICE) {
+        let price = if tokens.first() == Some(&UNSPECIFIED_PRICE) {
             tokens.remove(0);
             None
         } else if let Some(p) = tokens.first().and_then(|t| parse_price(t, fmt)) {
@@ -99,11 +103,11 @@ impl Item {
     }
 
     /// Renders the canonical storage line for this item. When there's no
-    /// price and `fmt.places == 0`, `?` is written only if omitting it
-    /// would let the name's leading word be misread as a price on re-read
-    /// (or always, if `always_show_unspecified_price` is set) — the common
-    /// case (`Eggs`) stays untouched. Under any other `places`, `?` is
-    /// never written — there's no collision it would need to guard against.
+    /// price, `?` is written if omitting it would let the name's leading
+    /// word be misread as a price on re-read (or always, if
+    /// `always_show_unspecified_price` is set) — the common case (`Eggs`)
+    /// stays untouched. This applies for any `PriceFormat`, not just
+    /// `places == 0` — a name can collide with a full decimal shape too.
     pub fn to_line(&self, fmt: PriceFormat, always_show_unspecified_price: bool) -> String {
         let mut parts = Vec::new();
         if self.got {
@@ -114,14 +118,13 @@ impl Item {
         }
         match self.price {
             Some(cents) => parts.push(format_price(cents, fmt)),
-            None if fmt.places == 0 => {
+            None => {
                 let name_would_collide =
                     self.name.split_whitespace().next().is_some_and(|first| parse_price(first, fmt).is_some());
                 if always_show_unspecified_price || name_would_collide {
                     parts.push(UNSPECIFIED_PRICE.to_string());
                 }
             }
-            None => {}
         }
         parts.push(self.name.clone());
         if self.qty != 1 {
@@ -323,9 +326,16 @@ mod tests {
     fn known_edge_cases_documented_not_panicking() {
         // A name whose first word looks like a price is claimed as PRICE,
         // not part of the name — accepted tradeoff, documented in the plan.
+        // This holds for any PriceFormat, not just decimal_places == 0: a
+        // name can collide with a full decimal shape under the default
+        // config too (a book literally titled starting with a price).
         let i = item("12.99 discount voucher");
         assert_eq!(i.price, Some(1299));
         assert_eq!(i.name, "discount voucher");
+
+        let i = item("1.99 and the Psychology of Pricing");
+        assert_eq!(i.price, Some(199));
+        assert_eq!(i.name, "and the Psychology of Pricing");
 
         // A name whose last word looks like a qty tag is claimed as QTY.
         let i = item("Model x3");
@@ -382,22 +392,26 @@ mod tests {
 
     #[test]
     fn unspecified_price_placeholder_parses_as_no_price() {
-        // Only meaningful under places == 0 — the only config where a bare
-        // leading token could otherwise be misread as PRICE.
-        let fmt = PriceFormat { separator: '.', places: 0 };
-        let i = Item::parse("? Eggs", fmt).unwrap();
+        // Works under any PriceFormat, not just places == 0 -- a user with
+        // a decimal currency can still deliberately mark a price unknown.
+        let i = item("? Eggs");
         assert_eq!(i.price, None);
         assert_eq!(i.name, "Eggs");
+
+        let fmt0 = PriceFormat { separator: '.', places: 0 };
+        assert_eq!(Item::parse("? Eggs", fmt0).unwrap().price, None);
     }
 
     #[test]
-    fn placeholder_not_recognized_when_places_nonzero() {
-        // Under the default config there's no digit-leading collision to
-        // guard against, so a leading `?` is just ordinary name text —
-        // preserved literally, not silently eaten.
-        let i = item("? Eggs");
+    fn known_edge_case_name_starting_with_placeholder_char() {
+        // Same structural tradeoff as the price/qty collisions above: `?`
+        // is unconditionally the marker in leading position, so a name
+        // that itself opens with a literal `?` loses that character on
+        // parse. Accepted and documented, not engineered around -- the
+        // format has no way to tell the two apart.
+        let i = item("? Kidding, no idea what to get");
         assert_eq!(i.price, None);
-        assert_eq!(i.name, "? Eggs");
+        assert_eq!(i.name, "Kidding, no idea what to get");
     }
 
     #[test]
@@ -434,17 +448,13 @@ mod tests {
 
     #[test]
     fn always_show_unspecified_price_forces_placeholder() {
+        // Works under the default (decimal) config too -- not just
+        // places == 0 -- so a user can always opt into visibly marking
+        // every priceless item as a matter of preference.
         let i = Item { got: false, priority: None, price: None, qty: 1, name: "Eggs".to_string(), raw: String::new() };
-        let fmt = PriceFormat { separator: '.', places: 0 };
-        assert_eq!(i.to_line(fmt, true), "? Eggs");
-    }
+        assert_eq!(i.to_line(PriceFormat::default(), true), "? Eggs");
 
-    #[test]
-    fn always_show_unspecified_price_is_noop_when_places_nonzero() {
-        // `?` is never written under places > 0 -- there's no config where
-        // recognizing it back on read would be meaningful, so writing it
-        // would just corrupt the name on the next round-trip.
-        let i = Item { got: false, priority: None, price: None, qty: 1, name: "Eggs".to_string(), raw: String::new() };
-        assert_eq!(i.to_line(PriceFormat::default(), true), "Eggs");
+        let fmt0 = PriceFormat { separator: '.', places: 0 };
+        assert_eq!(i.to_line(fmt0, true), "? Eggs");
     }
 }
