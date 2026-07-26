@@ -186,6 +186,17 @@ mod tests {
     }
 
     #[test]
+    fn empty_value_is_not_a_reserved_tag() {
+        // `phone:`/`email:` with nothing after the colon isn't a tag at all
+        // (deliberate guard in `reserved_tag`, not incidental) -- stays in
+        // name untouched, same as any other non-matching token.
+        let c = Contact::parse("John Smith phone: email:").unwrap();
+        assert_eq!(c.name, "John Smith phone: email:");
+        assert!(c.phone.is_empty());
+        assert!(c.email.is_empty());
+    }
+
+    #[test]
     fn parse_rejects_empty_name() {
         assert!(Contact::parse("phone:555-1234").is_err());
         assert!(Contact::parse("").is_err());
