@@ -2,12 +2,22 @@ use anyhow::{Context, Result};
 use chrono::{NaiveDate, NaiveDateTime, NaiveTime};
 use std::path::Path;
 
-/// One appointment, parsed from a line `DATE [START [END]] # TITLE`.
+/// One appointment, parsed from a line `DATE [START [END]] TITLE`.
+///
+/// No delimiter marks where the machine fields end and `TITLE` begins —
+/// parsing is purely shape-based: `DATE` is `YYYY-MM-DD`, `START`/times are
+/// `HH:MM`, and the longest matching prefix of leading date/time-shaped
+/// tokens is claimed, greedily, before whatever's left becomes the title.
 ///
 /// - `START` is `HH:MM`; absent for an all-day event.
 /// - `END` is `HH:MM` (same day) or `YYYY-MM-DD HH:MM` (crosses to a later day).
 ///   With no `START`, a bare `YYYY-MM-DD` END makes a multi-day all-day event
 ///   (inclusive last day).
+///
+/// Accepted tradeoff: a title that itself opens with well-formed date/time
+/// tokens (e.g. "09:00 sync") can have those leading words misclaimed as
+/// machine fields rather than title text. Rare in practice; not worth an
+/// escaping/quoting scheme.
 #[derive(Debug, Clone, PartialEq)]
 pub struct Appt {
     pub date: NaiveDate,
@@ -20,42 +30,34 @@ pub struct Appt {
 
 impl Appt {
     pub fn parse(line: &str) -> Result<Appt> {
-        let (left, title) = line
-            .split_once(" # ")
-            .with_context(|| format!("missing ' # title' in line: {:?}", line))?;
-        let title = title.trim();
-        anyhow::ensure!(!title.is_empty(), "empty title in line: {:?}", line);
-
-        let tokens: Vec<&str> = left.split_whitespace().collect();
+        let tokens: Vec<&str> = line.split_whitespace().collect();
         anyhow::ensure!(!tokens.is_empty(), "missing date in line: {:?}", line);
-        let date = NaiveDate::parse_from_str(tokens[0], "%Y-%m-%d")
-            .with_context(|| format!("invalid date {:?}", tokens[0]))?;
+        let date = parse_date(tokens[0]).with_context(|| format!("invalid date {:?}", tokens[0]))?;
 
-        let (start, end) = match tokens[1..] {
-            [] => (None, None),
-            [x] => match parse_time(x) {
-                Ok(t) => (Some(t), None),
-                Err(_) => {
-                    let end_date = NaiveDate::parse_from_str(x, "%Y-%m-%d")
-                        .with_context(|| format!("invalid time or end date {:?}", x))?;
-                    anyhow::ensure!(end_date > date, "end date not after start in line: {:?}", line);
-                    (None, Some(end_date.and_time(NaiveTime::MIN)))
-                }
-            },
-            [s, e] => {
-                let start = parse_time(s)?;
-                (Some(start), Some(date.and_time(parse_time(e)?)))
+        let rest = &tokens[1..];
+        // Longest shape-match first: `TIME DATE TIME` (start day/time to a
+        // later end day/time), then `TIME TIME` (same-day end), then a lone
+        // `TIME` (start only) or `DATE` (bare end date, multi-day all-day).
+        let (start, end, consumed) = match rest {
+            [s, ed, et, ..] if parse_time(s).is_ok() && parse_date(ed).is_ok() && parse_time(et).is_ok() => {
+                (Some(parse_time(s)?), Some(parse_date(ed)?.and_time(parse_time(et)?)), 3)
             }
-            [s, ed, et] => {
-                let start = parse_time(s)?;
-                let end_date = NaiveDate::parse_from_str(ed, "%Y-%m-%d")
-                    .with_context(|| format!("invalid end date {:?}", ed))?;
-                (Some(start), Some(end_date.and_time(parse_time(et)?)))
+            [s, e, ..] if parse_time(s).is_ok() && parse_time(e).is_ok() => {
+                (Some(parse_time(s)?), Some(date.and_time(parse_time(e)?)), 2)
             }
-            _ => anyhow::bail!("too many time fields in line: {:?}", line),
+            [s, ..] if parse_time(s).is_ok() => (Some(parse_time(s)?), None, 1),
+            [ed, ..] if parse_date(ed).is_ok() => {
+                let end_date = parse_date(ed)?;
+                anyhow::ensure!(end_date > date, "end date not after start in line: {:?}", line);
+                (None, Some(end_date.and_time(NaiveTime::MIN)), 1)
+            }
+            _ => (None, None, 0),
         };
 
-        Ok(Appt { date, start, end, title: title.to_string(), raw: line.to_string() })
+        let title = rest[consumed..].join(" ");
+        anyhow::ensure!(!title.is_empty(), "missing title in line: {:?}", line);
+
+        Ok(Appt { date, start, end, title, raw: line.to_string() })
     }
 
     /// Sort/comparison key: the start instant, with all-day events at day start.
@@ -83,12 +85,16 @@ impl Appt {
         } else if let Some(end) = self.end {
             s.push_str(&format!(" {}", end.format("%Y-%m-%d")));
         }
-        format!("{} # {}", s, self.title)
+        format!("{} {}", s, self.title)
     }
 }
 
 fn parse_time(s: &str) -> Result<NaiveTime> {
     NaiveTime::parse_from_str(s, "%H:%M").with_context(|| format!("invalid time {:?}", s))
+}
+
+fn parse_date(s: &str) -> Result<NaiveDate> {
+    NaiveDate::parse_from_str(s, "%Y-%m-%d").with_context(|| format!("invalid date {:?}", s))
 }
 
 fn read_lines(path: &Path) -> Result<Vec<String>> {
@@ -145,7 +151,7 @@ mod tests {
 
     #[test]
     fn parse_all_day() {
-        let a = Appt::parse("2026-12-25 # Christmas").unwrap();
+        let a = Appt::parse("2026-12-25 Christmas").unwrap();
         assert_eq!(a.date, NaiveDate::from_ymd_opt(2026, 12, 25).unwrap());
         assert_eq!(a.start, None);
         assert_eq!(a.end, None);
@@ -154,7 +160,7 @@ mod tests {
 
     #[test]
     fn parse_start_only() {
-        let a = Appt::parse("2026-07-14 09:00 # Team sync").unwrap();
+        let a = Appt::parse("2026-07-14 09:00 Team sync").unwrap();
         assert_eq!(a.start, NaiveTime::from_hms_opt(9, 0, 0));
         assert_eq!(a.end, None);
         assert_eq!(a.title, "Team sync");
@@ -162,7 +168,7 @@ mod tests {
 
     #[test]
     fn parse_same_day_end() {
-        let a = Appt::parse("2026-07-14 09:00 10:00 # Dentist @clinic").unwrap();
+        let a = Appt::parse("2026-07-14 09:00 10:00 Dentist @clinic").unwrap();
         assert_eq!(a.start, NaiveTime::from_hms_opt(9, 0, 0));
         assert_eq!(a.end.unwrap(), NaiveDate::from_ymd_opt(2026, 7, 14).unwrap().and_hms_opt(10, 0, 0).unwrap());
         assert_eq!(a.title, "Dentist @clinic");
@@ -170,13 +176,13 @@ mod tests {
 
     #[test]
     fn parse_cross_day_end() {
-        let a = Appt::parse("2026-07-14 20:00 2026-07-15 02:00 # Party").unwrap();
+        let a = Appt::parse("2026-07-14 20:00 2026-07-15 02:00 Party").unwrap();
         assert_eq!(a.end.unwrap(), NaiveDate::from_ymd_opt(2026, 7, 15).unwrap().and_hms_opt(2, 0, 0).unwrap());
     }
 
     #[test]
     fn parse_multi_day_all_day() {
-        let a = Appt::parse("2026-07-17 2026-07-20 # Wedding").unwrap();
+        let a = Appt::parse("2026-07-17 2026-07-20 Wedding").unwrap();
         assert_eq!(a.start, None);
         assert_eq!(a.end.unwrap(), NaiveDate::from_ymd_opt(2026, 7, 20).unwrap().and_time(NaiveTime::MIN));
         assert_eq!(a.last_date(), NaiveDate::from_ymd_opt(2026, 7, 20).unwrap());
@@ -185,29 +191,29 @@ mod tests {
 
     #[test]
     fn parse_rejects_end_date_not_after_start() {
-        assert!(Appt::parse("2026-07-17 2026-07-17 # x").is_err());
-        assert!(Appt::parse("2026-07-17 2026-07-16 # x").is_err());
+        assert!(Appt::parse("2026-07-17 2026-07-17 x").is_err());
+        assert!(Appt::parse("2026-07-17 2026-07-16 x").is_err());
     }
 
     #[test]
     fn parse_rejects_missing_title() {
         assert!(Appt::parse("2026-07-14 09:00").is_err());
-        assert!(Appt::parse("2026-07-14 09:00 # ").is_err());
+        assert!(Appt::parse("2026-07-14").is_err());
     }
 
     #[test]
     fn parse_rejects_bad_date() {
-        assert!(Appt::parse("not-a-date # x").is_err());
+        assert!(Appt::parse("not-a-date x").is_err());
     }
 
     #[test]
     fn to_line_round_trips() {
         for line in [
-            "2026-12-25 # Christmas",
-            "2026-07-14 09:00 # Team sync",
-            "2026-07-14 09:00 10:00 # Dentist @clinic",
-            "2026-07-14 20:00 2026-07-15 02:00 # Party",
-            "2026-07-17 2026-07-20 # Wedding",
+            "2026-12-25 Christmas",
+            "2026-07-14 09:00 Team sync",
+            "2026-07-14 09:00 10:00 Dentist @clinic",
+            "2026-07-14 20:00 2026-07-15 02:00 Party",
+            "2026-07-17 2026-07-20 Wedding",
         ] {
             assert_eq!(Appt::parse(line).unwrap().to_line(), line);
         }
@@ -215,8 +221,24 @@ mod tests {
 
     #[test]
     fn start_dt_orders_all_day_first() {
-        let allday = Appt::parse("2026-07-14 # Holiday").unwrap();
-        let timed = Appt::parse("2026-07-14 09:00 # Standup").unwrap();
+        let allday = Appt::parse("2026-07-14 Holiday").unwrap();
+        let timed = Appt::parse("2026-07-14 09:00 Standup").unwrap();
         assert!(allday.start_dt() < timed.start_dt());
+    }
+
+    #[test]
+    fn known_edge_case_title_swallows_leading_time_shaped_word() {
+        // Accepted tradeoff: a title that itself opens with a well-formed
+        // time collides with START, documented rather than escaped around.
+        let a = Appt::parse("2026-07-14 09:00 sync").unwrap();
+        assert_eq!(a.start, NaiveTime::from_hms_opt(9, 0, 0));
+        assert_eq!(a.title, "sync");
+    }
+
+    #[test]
+    fn known_edge_case_title_swallows_full_end_shape() {
+        let a = Appt::parse("2026-07-14 09:00 2026-08-01 17:00 conference debrief").unwrap();
+        assert_eq!(a.end.unwrap(), NaiveDate::from_ymd_opt(2026, 8, 1).unwrap().and_hms_opt(17, 0, 0).unwrap());
+        assert_eq!(a.title, "conference debrief");
     }
 }

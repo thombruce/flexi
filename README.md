@@ -20,7 +20,7 @@ Each is also on the Homebrew tap: `brew install thombruce/tap/<tool>`.
 ## Shared design
 
 - **Plaintext, one entry per line** — greppable, diffable, and editable by hand or with `<tool> edit`.
-- **A ` # ` convention** separates the machine-readable fields at the start of a line from free text (a note or title) after it — used by flexi, clocking, and calchemy. bagg is the exception: its format is fully todo.txt-native (leading status/priority markers, a trailing inline tag, no `#`) — see [`crates/bagg/`](crates/bagg/) for why.
+- **A ` # ` convention** separates the machine-readable fields at the start of a line from free text (a note) after it — used by flexi and clocking. calchemy and bagg are both fully todo.txt-native instead (no `#`; leading date/time or status/priority markers, shape-parsed) — see their READMEs for the tradeoffs that come with dropping the delimiter.
 - **XDG paths** — data under `~/.local/share/<tool>/`, config at `~/.config/<tool>/<tool>.toml`.
 - **Independent releases** — each crate versions and ships on its own from a `<crate>-vX.Y.Z` tag.
 
