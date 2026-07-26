@@ -1,5 +1,6 @@
 mod config;
 mod storage;
+mod tags;
 
 use anyhow::{Context, Result};
 use chrono::{Datelike, NaiveDate, NaiveTime};
@@ -34,6 +35,9 @@ enum Commands {
     List {
         #[command(flatten)]
         filter: ApptFilter,
+        /// Only appointments carrying any of these `+project`/`@context`/
+        /// `key:value` tags (case-insensitive)
+        tags: Vec<String>,
     },
     /// Show today's appointments (shortcut for `list --today`)
     Today,
@@ -168,7 +172,7 @@ fn month_end(first: NaiveDate) -> NaiveDate {
     next.unwrap() - chrono::Duration::days(1)
 }
 
-fn run_list(cfg: &config::ResolvedConfig, f: &ApptFilter) -> Result<()> {
+fn run_list(cfg: &config::ResolvedConfig, f: &ApptFilter, tag_queries: &[String]) -> Result<()> {
     let today = chrono::Local::now().date_naive();
     let appts = storage::read_appts(&cfg.path)?;
     let (since, until) = filter_window(cfg, f, today)?;
@@ -176,6 +180,9 @@ fn run_list(cfg: &config::ResolvedConfig, f: &ApptFilter) -> Result<()> {
     let windowed = since.is_some() || until.is_some() || f.today || f.week || f.month;
     // An appointment is in a window if its [date, last_date] span overlaps it.
     let view: Vec<Appt> = appts.into_iter().filter(|a| {
+        if !tags::matches(&a.title, tag_queries) {
+            return false;
+        }
         if windowed {
             since.is_none_or(|s| a.last_date() >= s) && until.is_none_or(|u| a.date <= u)
         } else if f.all {
@@ -245,9 +252,9 @@ fn main() -> Result<()> {
             }
         }
         Some(Commands::Week) => {
-            run_list(&cfg, &ApptFilter { today: false, week: true, month: false, since: None, until: None, all: false, past: false })?;
+            run_list(&cfg, &ApptFilter { today: false, week: true, month: false, since: None, until: None, all: false, past: false }, &[])?;
         }
-        Some(Commands::List { filter }) => run_list(&cfg, &filter)?,
+        Some(Commands::List { filter, tags }) => run_list(&cfg, &filter, &tags)?,
         Some(Commands::Next) => {
             let now = chrono::Local::now().naive_local();
             let next = upcoming(&cfg, today)?

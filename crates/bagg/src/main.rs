@@ -1,5 +1,6 @@
 mod config;
 mod storage;
+mod tags;
 
 use anyhow::{Context, Result};
 use clap::{Args, CommandFactory, Parser, Subcommand};
@@ -34,6 +35,9 @@ enum Commands {
     List {
         #[command(flatten)]
         filter: ItemFilter,
+        /// Only items carrying any of these `+project`/`@context`/`key:value`
+        /// tags (case-insensitive)
+        tags: Vec<String>,
     },
     /// Toggle got/not-got status for the item at this position in `list`
     Got {
@@ -95,7 +99,7 @@ fn find_item(cfg: &config::ResolvedConfig, index: usize) -> Result<Item> {
         .with_context(|| format!("no item {} — run `bagg list`", index))
 }
 
-fn run_list(cfg: &config::ResolvedConfig, filter: &ItemFilter) -> Result<()> {
+fn run_list(cfg: &config::ResolvedConfig, filter: &ItemFilter, tag_queries: &[String]) -> Result<()> {
     let items = all_sorted(cfg)?;
     if items.is_empty() {
         println!("list is empty");
@@ -107,6 +111,9 @@ fn run_list(cfg: &config::ResolvedConfig, filter: &ItemFilter) -> Result<()> {
             continue;
         }
         if filter.got && !item.got {
+            continue;
+        }
+        if !tags::matches(&item.name, tag_queries) {
             continue;
         }
         let n = format!("{:>width$}", i + 1, width = width);
@@ -134,8 +141,8 @@ fn main() -> Result<()> {
     let cfg = config::resolve()?;
 
     match cli.command {
-        None => run_list(&cfg, &ItemFilter { pending: false, got: false })?,
-        Some(Commands::List { filter }) => run_list(&cfg, &filter)?,
+        None => run_list(&cfg, &ItemFilter { pending: false, got: false }, &[])?,
+        Some(Commands::List { filter, tags }) => run_list(&cfg, &filter, &tags)?,
         Some(Commands::Add { price, qty, priority, name }) => {
             let name = name.join(" ");
             anyhow::ensure!(!name.trim().is_empty(), "an item needs a name");
