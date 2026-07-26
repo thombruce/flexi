@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.2.0] - 2026-07-26
+
 ### Added
 
 - `bagg list` now takes `+project`/`@context`/`key:value` tag queries (e.g. `bagg list +kitchen-reno`), matched case-insensitively against tags embedded in item names; multiple queries match if an item carries ANY of them. Tags aren't a stored field — they're parsed on the fly from the existing free-text `NAME`, same convention todo.txt uses, and don't affect sort order.
