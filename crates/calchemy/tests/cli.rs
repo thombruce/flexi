@@ -214,6 +214,20 @@ fn list_filters_by_tag() {
 }
 
 #[test]
+fn tag_filter_composes_as_and_with_date_window() {
+    let dir = tempdir().unwrap();
+    write_log(
+        dir.path(),
+        &format!("{} Standup @clinic\n{} Sync\n{} Checkup @clinic\n", day(0), day(0), day(3)),
+    );
+    // --today AND @clinic: only the tagged appointment that's also today.
+    let o = out(calchemy(&["list", "--today", "@clinic"], dir.path()));
+    assert!(o.contains("Standup"), "{o}");
+    assert!(!o.contains("Sync"), "today but untagged: {o}");
+    assert!(!o.contains("Checkup"), "tagged but not today: {o}");
+}
+
+#[test]
 fn completions_and_man_smoke() {
     let dir = tempdir().unwrap();
     assert!(out(calchemy(&["completions", "bash"], dir.path())).contains("calchemy"));
