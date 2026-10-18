@@ -1152,3 +1152,12 @@ fn bare_clocked_in_rounds_elapsed() {
     let text = String::from_utf8_lossy(&out);
     assert!(text.contains("15 min so far"), "was {text}");
 }
+
+#[test]
+fn whitespace_only_tail_line_is_skipped() {
+    let dir = tempdir().unwrap();
+    write_log(dir.path(), "2026-07-11 09:00 +1 hr > 1 hr\n   \n");
+    flexi(&[], dir.path()).success().stdout("1 hr\n");
+    flexi(&["add", "30", "min"], dir.path()).success();
+    flexi(&[], dir.path()).success().stdout("1 hr 30 min\n");
+}

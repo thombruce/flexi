@@ -1,6 +1,6 @@
 use crate::config::TimestampFormat;
 use crate::time::parse_duration;
-use anyhow::{Context, Result};
+use anyhow::Result;
 use std::path::Path;
 
 pub struct LogEntry {
@@ -54,56 +54,25 @@ impl LogEntry {
 }
 
 pub fn append_log(path: &Path, description: &str, ts_format: TimestampFormat) -> Result<()> {
-    if let Some(parent) = path.parent() {
-        std::fs::create_dir_all(parent)
-            .with_context(|| format!("creating directory {:?}", parent))?;
-    }
     let now = chrono::Local::now();
     let timestamp = match ts_format {
         TimestampFormat::Simple => now.format("%Y-%m-%d %H:%M").to_string(),
         TimestampFormat::Full => now.to_rfc3339_opts(chrono::SecondsFormat::Secs, false),
     };
-    let line = format!("{} {}\n", timestamp, description);
-    use std::io::Write;
-    let mut file = std::fs::OpenOptions::new()
-        .create(true)
-        .append(true)
-        .open(path)
-        .with_context(|| format!("opening {:?}", path))?;
-    file.write_all(line.as_bytes())
-        .with_context(|| format!("writing {:?}", path))
+    foolscap::append_line(path, &format!("{} {}", timestamp, description))
 }
 
 pub fn read_log(path: &Path) -> Result<Vec<LogEntry>> {
-    if !path.exists() {
-        return Ok(vec![]);
-    }
-    let raw = std::fs::read_to_string(path)
-        .with_context(|| format!("reading {:?}", path))?;
-    raw.lines()
-        .filter(|l| !l.is_empty())
-        .map(parse_log_line)
-        .collect()
+    foolscap::read_lines(path)?.iter().map(|l| parse_log_line(l)).collect()
 }
 
 pub fn pop_log(path: &Path) -> Result<Option<LogEntry>> {
-    if !path.exists() {
+    let mut lines = foolscap::read_lines(path)?;
+    let Some(last) = lines.pop() else {
         return Ok(None);
-    }
-    let raw = std::fs::read_to_string(path)
-        .with_context(|| format!("reading {:?}", path))?;
-    let mut lines: Vec<&str> = raw.lines().filter(|l| !l.is_empty()).collect();
-    if lines.is_empty() {
-        return Ok(None);
-    }
-    let last = parse_log_line(lines.pop().unwrap())?;
-    let tmp = path.with_extension("tmp");
-    let content = lines.join("\n");
-    let content = if content.is_empty() { content } else { content + "\n" };
-    std::fs::write(&tmp, content)
-        .with_context(|| format!("writing {:?}", tmp))?;
-    std::fs::rename(&tmp, path)
-        .with_context(|| format!("renaming {:?} to {:?}", tmp, path))?;
+    };
+    let last = parse_log_line(&last)?;
+    foolscap::write_lines(path, &lines)?;
     Ok(Some(last))
 }
 
@@ -117,27 +86,11 @@ fn parse_log_line(line: &str) -> Result<LogEntry> {
 }
 
 pub fn last_entry(path: &Path) -> Result<Option<LogEntry>> {
-    if !path.exists() {
-        return Ok(None);
-    }
-    let raw = std::fs::read_to_string(path)
-        .with_context(|| format!("reading {:?}", path))?;
-    match raw.lines().rev().find(|l| !l.is_empty()) {
-        None => Ok(None),
-        Some(line) => Ok(Some(parse_log_line(line)?)),
-    }
+    foolscap::read_lines(path)?.pop().map(|l| parse_log_line(&l)).transpose()
 }
 
 pub fn read_minutes(path: &Path) -> Result<i32> {
-    if !path.exists() {
-        return Ok(0);
-    }
-    let raw = std::fs::read_to_string(path)
-        .with_context(|| format!("reading {:?}", path))?;
-    match raw.lines().rev().find(|l| !l.is_empty()) {
-        None => Ok(0),
-        Some(line) => parse_log_line(line)?.new_minutes(),
-    }
+    last_entry(path)?.map_or(Ok(0), |e| e.new_minutes())
 }
 
 #[cfg(test)]

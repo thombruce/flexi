@@ -161,7 +161,7 @@ fn main() -> Result<()> {
             // Created is always stamped: a due date is only expressible after one.
             let todo = Todo { done: false, priority, closed: None, created: Some(today), due, title, raw: String::new() };
             let line = todo.to_line();
-            storage::append_todo(&cfg.path, &line)?;
+            storage::append_line(&cfg.path, &line)?;
             println!("added: {}", line);
         }
         Some(Commands::Done { index }) => {
@@ -179,11 +179,7 @@ fn main() -> Result<()> {
             println!("removed: {}", todo.to_line());
         }
         Some(Commands::Edit) => {
-            let editor = std::env::var("EDITOR").unwrap_or_else(|_| "vi".to_string());
-            std::process::Command::new(&editor)
-                .arg(&cfg.path)
-                .status()
-                .with_context(|| format!("failed to launch editor {:?}", editor))?;
+            foolscap::open_in_editor(&cfg.path)?;
         }
         Some(Commands::Completions { .. }) | Some(Commands::Man) => unreachable!(),
     }

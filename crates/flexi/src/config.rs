@@ -1,4 +1,4 @@
-use anyhow::{Context, Result};
+use anyhow::Result;
 use serde::Deserialize;
 use std::path::PathBuf;
 
@@ -36,13 +36,11 @@ pub struct ResolvedConfig {
 }
 
 pub fn resolve() -> Result<ResolvedConfig> {
-    let raw = load_config()?;
+    let raw: RawConfig = foolscap::load_config("flexi")?;
 
-    let path = if let Some(p) = raw.path {
-        p
-    } else {
-        let data_dir = xdg_data_dir().context("cannot determine data directory")?;
-        data_dir.join("flexi").join("flexi.txt")
+    let path = match raw.path {
+        Some(p) => p,
+        None => foolscap::default_data_path("flexi")?,
     };
 
     let increment = raw.increment.unwrap_or(1);
@@ -61,33 +59,4 @@ pub fn resolve() -> Result<ResolvedConfig> {
         increment: increment as i32,
         max_session: raw.max_session.map(|m| m as i32),
     })
-}
-
-fn load_config() -> Result<RawConfig> {
-    let config_dir = match xdg_config_dir() {
-        Some(d) => d,
-        None => return Ok(RawConfig::default()),
-    };
-
-    let config_path = config_dir.join("flexi").join("flexi.toml");
-    if !config_path.exists() {
-        return Ok(RawConfig::default());
-    }
-
-    let raw = std::fs::read_to_string(&config_path)
-        .with_context(|| format!("reading {:?}", config_path))?;
-
-    toml::from_str(&raw).with_context(|| format!("parsing {:?}", config_path))
-}
-
-fn xdg_config_dir() -> Option<PathBuf> {
-    std::env::var_os("XDG_CONFIG_HOME")
-        .map(PathBuf::from)
-        .or_else(|| dirs::home_dir().map(|h| h.join(".config")))
-}
-
-fn xdg_data_dir() -> Option<PathBuf> {
-    std::env::var_os("XDG_DATA_HOME")
-        .map(PathBuf::from)
-        .or_else(|| dirs::home_dir().map(|h| h.join(".local/share")))
 }

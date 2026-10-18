@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- **Breaking:** `edit` now runs `$EDITOR` through `sh`, as git does. It may now carry arguments (e.g. `code -w`), but an editor path containing spaces must be quoted inside `$EDITOR`; an unquoted one that used to work now fails. `edit` now needs `sh`, so it no longer works on Windows.
+- `edit` reports an error when the editor can't be run (exit 126/127, e.g. a typo), and only warns for any other non-zero exit. It also creates the data directory first, so editing before the first entry works.
+
+### Fixed
+
+- Data-file rewrites are synced to disk before the atomic rename, so a crash can't leave the file empty or truncated.
+- Adding an entry to a hand-edited file that lacks a final newline no longer glues the new line onto the last one.
+- Whitespace-only lines in the log are now skipped rather than failing to parse, and dropped when the file is rewritten (e.g. by `undo`).
+
 ## [0.16.0] - 2026-07-11
 
 ### Added

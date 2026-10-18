@@ -1,0 +1,16 @@
+[package]
+name = "foolscap"
+version = "0.1.0"
+edition = "2021"
+description = "Shared plumbing (XDG paths, config loading, atomic line I/O) for the flexi family of plaintext CLI tools"
+license = "MIT"
+repository = "https://github.com/thombruce/flexi"
+
+[dependencies]
+anyhow = "1"
+dirs = "5"
+serde = "1"
+toml = "0.8"
+
+[dev-dependencies]
+tempfile = "3"

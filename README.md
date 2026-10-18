@@ -26,6 +26,7 @@ Each is also on the Homebrew tap: `brew install thombruce/tap/<tool>`.
 - **Plaintext, one entry per line** — greppable, diffable, and editable by hand or with `<tool> edit`.
 - **A ` # ` convention** separates the machine-readable fields at the start of a line from free text (a note) after it — used by flexi and clocking. calchemy, bagg, holler, and toodles are all fully todo.txt-native instead (no `#`; leading markers or `key:value` tags found anywhere in the line, shape-parsed) — see their READMEs for the tradeoffs that come with dropping the delimiter.
 - **XDG paths** — data under `~/.local/share/<tool>/`, config at `~/.config/<tool>/<tool>.toml`.
+- **Shared plumbing** — XDG paths, config loading, atomic line I/O, and `$EDITOR` launching live in the [`foolscap`](crates/foolscap/) library crate; everything domain-specific stays in each tool.
 - **Independent releases** — each crate versions and ships on its own from a `<crate>-vX.Y.Z` tag.
 
 ## Development

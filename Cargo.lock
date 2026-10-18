@@ -132,12 +132,11 @@ dependencies = [
  "clap",
  "clap_complete",
  "clap_mangen",
- "dirs",
+ "foolscap",
  "owo-colors",
  "predicates",
  "serde",
  "tempfile",
- "toml",
 ]
 
 [[package]]
@@ -185,12 +184,11 @@ dependencies = [
  "clap",
  "clap_complete",
  "clap_mangen",
- "dirs",
+ "foolscap",
  "owo-colors",
  "predicates",
  "serde",
  "tempfile",
- "toml",
 ]
 
 [[package]]
@@ -300,12 +298,11 @@ dependencies = [
  "clap",
  "clap_complete",
  "clap_mangen",
- "dirs",
+ "foolscap",
  "owo-colors",
  "predicates",
  "serde",
  "tempfile",
- "toml",
 ]
 
 [[package]]
@@ -442,12 +439,11 @@ dependencies = [
  "clap",
  "clap_complete",
  "clap_mangen",
- "dirs",
+ "foolscap",
  "owo-colors",
  "serde",
  "serde_json",
  "tempfile",
- "toml",
 ]
 
 [[package]]
@@ -464,6 +460,17 @@ name = "foldhash"
 version = "0.1.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "d9c4f5dac5e15c24eb999c26181a6ca40b39fe946cbe4c263c7209467bc83af2"
+
+[[package]]
+name = "foolscap"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "dirs",
+ "serde",
+ "tempfile",
+ "toml",
+]
 
 [[package]]
 name = "futures-core"
@@ -570,12 +577,11 @@ dependencies = [
  "clap",
  "clap_complete",
  "clap_mangen",
- "dirs",
+ "foolscap",
  "owo-colors",
  "predicates",
  "serde",
  "tempfile",
- "toml",
 ]
 
 [[package]]
@@ -1285,12 +1291,11 @@ dependencies = [
  "clap",
  "clap_complete",
  "clap_mangen",
- "dirs",
+ "foolscap",
  "owo-colors",
  "predicates",
  "serde",
  "tempfile",
- "toml",
 ]
 
 [[package]]
