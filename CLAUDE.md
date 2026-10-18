@@ -12,7 +12,7 @@ Cargo workspace (`Cargo.toml` at root, `members = ["crates/*"]`). Each tool is i
 - `crates/bagg` — a plaintext shopping list / wishlist.
 - `crates/holler` — a plaintext contacts / rolodex.
 - `crates/toodles` — a plaintext todo list (todo.txt + due date).
-- `crates/foolscap` — library crate (no binary): the plumbing all six tools share.
+- `crates/foolscap` — library crate (no binary): the plumbing all six tools share, growing into a set of opt-in building blocks (see **The `foolscap` crate** below).
 
 All six share the same plaintext-file + XDG-config approach. What's copied vs. divergent:
 
@@ -20,7 +20,29 @@ All six share the same plaintext-file + XDG-config approach. What's copied vs. d
 - `time.rs` (duration parse/format/round) is shared by flexi and clocking only; **calchemy, bagg, holler, and toodles have no `time.rs`** — calchemy and toodles parse dates via chrono rather than durations, and neither bagg nor holler have a time dimension at all.
 - `storage.rs` is **not** shared — each crate's storage semantics differ: flexi keeps a running-balance chain (tail = state via `new_minutes()`); clocking records session durations summed over a period (`session_minutes()`); calchemy holds an unordered set of `Appt` records parsed and sorted by datetime, with `add`/`rm`/`edit` rewriting arbitrary lines rather than appending to a derived chain; bagg holds an unordered set of `Item` records parsed and sorted by status/priority/price (same shape as calchemy's set-of-records model, different sort key and no dates); holler holds an unordered set of `Contact` records with no positional grammar at all beyond extraction — sorted alphabetically by name, the only universal field; toodles holds an unordered set of `Todo` records — bagg's model with dates in place of price/qty.
 
-**`foolscap`** holds only the plumbing that was byte-identical across all six crates: `xdg_config_dir`/`xdg_data_dir`, `default_data_path`, `load_config::<T>`, `read_lines` (non-blank lines), `append_line` (repairs a missing final newline before appending), atomic `write_lines` (writes `<file>.tmp`, appended rather than replacing the extension, then renames), `remove_line`/`replace_line`, and `open_in_editor` (runs `$EDITOR` via `sh -c '<editor> "$@"'` like git, so args and quoted paths work; exit 126/127 — editor couldn't be run — is an error, any other non-zero exit only warns, since the file is already saved). It was extracted once toodles became the sixth tool, and a review found the same append bug in all six copies. Before that it was deliberately deferred: the shared surface is small, and the shared crate must be **published to crates.io before any dependent bin can publish**. Keep it minimal. Per-crate config structs, validation, and storage semantics stay in each crate. Set-of-records crates (calchemy, bagg, holler, toodles) re-export the line primitives they use from `storage.rs` (`pub use foolscap::{append_line, ...}`), so `main.rs` still calls `storage::*`. `open_in_editor` is called directly from each `main.rs` (it isn't storage). flexi/clocking wrap the line primitives in `append_log`/`read_log`/`pop_log`/`last_entry`, so every log read goes through `read_lines`. `tags.rs` and `time.rs` are still copied, not shared: they're domain code, not plumbing.
+**`foolscap`** holds only the plumbing that was byte-identical across all six crates: `xdg_config_dir`/`xdg_data_dir`, `default_data_path`, `load_config::<T>`, `read_lines` (non-blank lines), `append_line` (repairs a missing final newline before appending), atomic `write_lines` (writes `<file>.tmp`, appended rather than replacing the extension, then renames), `remove_line`/`replace_line`, and `open_in_editor` (runs `$EDITOR` via `sh -c '<editor> "$@"'` like git, so args and quoted paths work; exit 126/127 — editor couldn't be run — is an error, any other non-zero exit only warns, since the file is already saved). It was extracted once toodles became the sixth tool, and a review found the same append bug in all six copies. Before that it was deliberately deferred: the shared surface is small, and the shared crate must be **published to crates.io before any dependent bin can publish**. Keep it minimal. Per-crate config structs, validation, and storage semantics stay in each crate. Set-of-records crates (calchemy, bagg, holler, toodles) re-export the line primitives they use from `storage.rs` (`pub use foolscap::{append_line, ...}`), so `main.rs` still calls `storage::*`. `open_in_editor` is called directly from each `main.rs` (it isn't storage). flexi/clocking wrap the line primitives in `append_log`/`read_log`/`pop_log`/`last_entry`, so every log read goes through `read_lines`. `time.rs` is still copied (flexi/clocking only). `tags.rs` is still copied too, but is planned to move into foolscap (#54); see the next section.
+
+## The `foolscap` crate: direction
+
+**Committed direction (#53):** foolscap grows from shared plumbing into a library of **opt-in building blocks** for plaintext, one-record-per-line CLI tools. It is **never a line grammar.** Each tool keeps its own line shape (DATE first in calchemy, PRICE in bagg, no fixed positions in holler) and calls only the blocks it needs, then parses its own remainder.
+
+Planned blocks, each tracked as a sub-issue of #53:
+
+- **Tags** (#54): `+project`/`@context`/`key:value` in free text. Today `tags.rs` is four identical copies.
+- **`#hashtag`** (#55): a new tag kind in the tag family.
+- **Prefix markers** (#56): leading `x` done and `(A)` priority (bagg, toodles), later `~`/`!` (#41).
+- **Dates** (#57): strict `YYYY-MM-DD`, behind a `dates` cargo feature; the family rule is decided in #52.
+- **Note** (#58): the ` # note` suffix (flexi, clocking). It's opt-in and separate from the description/tags block.
+
+`# note` and `#hashtag` coexist by shape: a note starts at a **bare** `#` token, while a hashtag is `#` immediately followed by a word. Never make a bare `#` a tag, or `#word` a note.
+
+Rules for adding to foolscap:
+
+- **Extract only once real tools share it.** Two or more real users, no speculative blocks. Each block lands in foolscap and replaces the copies in the same change.
+- **Opt-in, and pay only for what you use.** A tool calls a block or doesn't. Blocks with heavy dependencies sit behind a cargo feature, so bagg/holler never pull in chrono.
+- **Tool-agnostic API.** Blocks take tokens or strings and return plain values, with no knowledge of which tool is calling and no tool-specific types or config.
+- **Still internal.** The README says foolscap isn't for general use, and that stays true until #59 (whether it *can* and *should* become a public library) is answered. Design blocks as if they might be public, but don't promise stability yet.
+- **Release order:** a foolscap release must be on crates.io before any tool that needs it (see Releases).
 
 ## The `toodles` crate
 
@@ -62,7 +84,7 @@ The `calchemy` crate (`main.rs` + `config.rs` + `storage.rs` + `tags.rs`, clap C
 
 bagg, calchemy, holler, and toodles' `list` all take trailing `+project`/`@context`/`key:value` tag queries (e.g. `bagg list +kitchen-reno`, `calchemy list @clinic`), matched case-insensitively, OR'd across multiple queries. This directly answers "how do I group related bagg items" (several parts for one project) — a shared `+project` tag is the grouping mechanism; nesting/indentation was considered and rejected since it breaks the one-line-per-record model these crates share.
 
-`tags.rs` is identical across all four crates (same duplication treatment as `time.rs` — shared by more than one, not extracted to a crate). It's read-only and works entirely off the existing free-text field (`NAME`/`TITLE`, or the untouched portion of holler's `name`): `extract_tag` classifies a single whitespace token as a tag if it starts with `+`/`@` (len > 1), or if it's a `key:value` pair whose key starts with a letter — that last condition specifically excludes a bare numeric token (a clock time like `10:00` in a calchemy title) from being misread as a tag, a real collision risk raised and resolved before implementation. `matches(text, queries)` extracts all tags from `text` and checks whether any query is present (case-folded); an empty query list matches everything. No struct field, no format change, no round-trip risk — tags are computed at query time only, and don't affect sort order in any of them. (holler additionally reserves `phone`/`email` keys for its own extraction, via a separate local helper in `storage.rs`, not `tags.rs` — see the holler section above.)
+`tags.rs` is identical across all four crates. It's planned to move into foolscap (#54), so change all four copies together until then. It's read-only and works entirely off the existing free-text field (`NAME`/`TITLE`, or the untouched portion of holler's `name`): `extract_tag` classifies a single whitespace token as a tag if it starts with `+`/`@` (len > 1), or if it's a `key:value` pair whose key starts with a letter — that last condition specifically excludes a bare numeric token (a clock time like `10:00` in a calchemy title) from being misread as a tag, a real collision risk raised and resolved before implementation. `matches(text, queries)` extracts all tags from `text` and checks whether any query is present (case-folded); an empty query list matches everything. No struct field, no format change, no round-trip risk — tags are computed at query time only, and don't affect sort order in any of them. (holler additionally reserves `phone`/`email` keys for its own extraction, via a separate local helper in `storage.rs`, not `tags.rs` — see the holler section above.)
 
 ## Commands
 
