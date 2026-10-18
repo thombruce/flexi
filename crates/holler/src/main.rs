@@ -1,10 +1,10 @@
 mod config;
 mod storage;
-mod tags;
 
 use anyhow::{Context, Result};
 use clap::{CommandFactory, Parser, Subcommand};
 use clap_complete::{generate, Shell};
+use foolscap::tags;
 use owo_colors::{OwoColorize, Stream::Stdout};
 use storage::Contact;
 
