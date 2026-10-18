@@ -189,3 +189,11 @@ fn list_wont_shows_only_obsolete() {
     assert!(open.contains("1  ! Write report") && !open.contains("Esperanto"), "{open}");
     toodles(&["list", "--wont", "--done"], dir.path()).failure();
 }
+
+#[test]
+fn due_accepts_bounded_unpadded_dates() {
+    let dir = tempdir().unwrap();
+    toodles(&["add", "--due", "2030-1-5", "Renew"], dir.path()).success();
+    assert_eq!(read_log(dir.path()).trim(), format!("{} 2030-01-05 Renew", today()));
+    toodles(&["add", "--due", "30-1-5", "Nope"], dir.path()).failure();
+}

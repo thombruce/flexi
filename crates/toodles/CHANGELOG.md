@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- Dates may drop leading zeros in the month and day (`2030-1-5`), in the file and in `--due`, and are written back padded. The year must be 4 digits, so looser shapes like `1-2-3` are still plain title text.
+
 ### Added
 
 - Lines may start with `!` (focus) or `~` (obsolete, won't do) as well as `x`, at most one per line. Todos sort focused, open, done, then obsolete. Obsolete todos take a closed date like done ones. `--open` includes focused todos.
@@ -21,5 +25,5 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `toodles add [--priority A-Z] [--due YYYY-MM-DD] <title...>` adds a todo, always stamping today as the created date.
 - Bare `toodles` and `toodles list` show every todo, sorted; `--open`/`--done` and `+project`/`@context`/`key:value` tag queries filter the view without renumbering. Open todos past their due date are shown in red.
 - `toodles done <n>` toggles done/open in place, stamping (or clearing) the closed date; priority is kept on completion.
-- `add` refuses a title that starts with a date unless `--due` is given, since the date would otherwise be read back as the due date. Dates must be zero-padded `YYYY-MM-DD`; `2024-9-1` is plain title text.
+- `add` refuses a title that starts with a date unless `--due` is given, since the date would otherwise be read back as the due date. Dates must have a 4-digit year; the month and day may drop leading zeros (`2030-1-5`, also accepted by `--due`), and are written back padded. Looser shapes like `1-2-3` are plain title text.
 - `toodles rm <n>`, `toodles edit`, `toodles completions <shell>`, `toodles man`.

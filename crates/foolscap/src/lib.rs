@@ -1,9 +1,11 @@
 //! Plumbing shared by the flexi family of plaintext tools: XDG path
 //! discovery, toml config loading, line-oriented file I/O with atomic
 //! rewrites, `$EDITOR` launching, and opt-in building blocks for parsing
-//! records (`prefix`, `tags`, `note`). Deliberately minimal — per-tool config
+//! records (`prefix`, `tags`, `note`, and `dates` behind the `dates` feature). Deliberately minimal — per-tool config
 //! structs, validation, and storage semantics stay in each tool's crate.
 
+#[cfg(feature = "dates")]
+pub mod dates;
 pub mod note;
 pub mod prefix;
 pub mod tags;
