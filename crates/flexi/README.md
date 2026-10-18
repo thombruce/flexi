@@ -89,9 +89,12 @@ All of the following time formats are accepted:
 | `N hr M min` | `1 hr 30 min`, `45 min`, `2 hr` |
 | `N hour M minutes` | `1 hour 30 minutes`, `2 hours` |
 | Compact | `1h30m`, `1h`, `30m`, `1.5h` |
+| Bare number (hours) | `1` (1 hour), `90` (90 hours, not minutes) |
 | Decimal hours | `1.5`, `0.5` |
 | Decimal hours with unit | `1.5 hours`, `1.5 hr` |
 | European decimal | `1,5`, `1,5 hours` |
+
+A number without a unit always means hours, whole or decimal: `1` is one hour just as `0.5` is half of one. For minutes, say so: `flexi add 90 min`.
 
 Positive balances display in green, negative in red. Negative balances display as e.g. `-1 hr 30 min`.
 
