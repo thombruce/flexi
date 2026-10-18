@@ -208,3 +208,24 @@ fn moving_between_done_and_wont_restamps_the_closed_date() {
     toodles(&["done", "1"], dir.path()).success();
     assert_eq!(read_log(dir.path()).trim(), format!("x {} 2020-01-01 Learn Esperanto", today()));
 }
+
+#[test]
+fn config_path_overrides_the_data_file() {
+    let dir = tempdir().unwrap();
+    let custom = dir.path().join("elsewhere").join("custom.txt");
+    fs::create_dir_all(dir.path().join("toodles")).unwrap();
+    fs::write(dir.path().join("toodles").join("toodles.toml"), format!("path = {:?}\n", custom.to_str().unwrap())).unwrap();
+    toodles(&["add", "Call", "mum"], dir.path()).success();
+    assert!(fs::read_to_string(&custom).unwrap().contains("Call mum"));
+    assert!(!dir.path().join("toodles").join("toodles.txt").exists());
+}
+
+#[test]
+fn bare_invocation_lists_sorted_or_says_empty() {
+    let dir = tempdir().unwrap();
+    assert_eq!(out(toodles(&[], dir.path())).trim(), "list is empty");
+    write_log(dir.path(), "Second\n(A) First\n");
+    let listing = out(toodles(&[], dir.path()));
+    assert_eq!(listing, out(toodles(&["list"], dir.path())));
+    assert!(listing.find("First").unwrap() < listing.find("Second").unwrap(), "{listing}");
+}

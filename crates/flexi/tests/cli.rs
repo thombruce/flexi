@@ -1169,3 +1169,14 @@ fn since_uses_the_family_date_rule() {
     flexi(&["log", "--since", "1-2-3"], dir.path()).failure();
     assert_eq!(log_lines(dir.path(), &["--since", "2026-7-1"]).len(), 1);
 }
+
+#[test]
+fn config_path_overrides_the_data_file() {
+    let dir = tempdir().unwrap();
+    let custom = dir.path().join("elsewhere").join("custom.txt");
+    fs::create_dir_all(dir.path().join("flexi")).unwrap();
+    fs::write(dir.path().join("flexi").join("flexi.toml"), format!("path = {:?}\n", custom.to_str().unwrap())).unwrap();
+    flexi(&["add", "30", "min"], dir.path()).success();
+    assert!(fs::read_to_string(&custom).unwrap().contains("+30 min"));
+    assert!(!dir.path().join("flexi").join("flexi.txt").exists());
+}

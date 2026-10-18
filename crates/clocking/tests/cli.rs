@@ -253,3 +253,74 @@ fn since_uses_the_family_date_rule() {
     clocking(&["log", "--since", "1-2-3"], dir.path()).failure();
     clocking(&["log", "--since", "2026-7-1"], dir.path()).success();
 }
+
+#[test]
+fn config_path_overrides_the_data_file() {
+    let dir = tempdir().unwrap();
+    let custom = dir.path().join("elsewhere").join("custom.txt");
+    fs::create_dir_all(dir.path().join("clocking")).unwrap();
+    fs::write(dir.path().join("clocking").join("clocking.toml"), format!("path = {:?}\n", custom.to_str().unwrap())).unwrap();
+    clocking(&["in"], dir.path()).success();
+    assert!(fs::read_to_string(&custom).unwrap().contains("@in"));
+    assert!(!dir.path().join("clocking").join("clocking.txt").exists());
+}
+
+fn day(offset: i64) -> chrono::NaiveDate {
+    Local::now().date_naive() + Duration::days(offset)
+}
+
+fn session_on(date: chrono::NaiveDate, dur: &str) -> String {
+    format!("{} 09:00 10:00 = {}\n", date.format("%Y-%m-%d"), dur)
+}
+
+#[test]
+fn log_date_filters() {
+    let dir = tempdir().unwrap();
+    let old = chrono::NaiveDate::from_ymd_opt(2020, 1, 1).unwrap();
+    write_log(dir.path(), &format!("{}{}{}", session_on(old, "3 hr"), session_on(day(-1), "2 hr"), session_on(day(0), "1 hr")));
+    let log = |flag: &str| stdout(clocking(&["log", flag], dir.path()));
+    let today = log("--today");
+    assert!(today.contains("= 1 hr") && !today.contains("= 2 hr") && !today.contains("= 3 hr"), "{today}");
+    let yesterday = log("--yesterday");
+    assert!(yesterday.contains("= 2 hr") && !yesterday.contains("= 1 hr"), "{yesterday}");
+    for flag in ["--week", "--month"] {
+        let o = log(flag);
+        assert!(o.contains("= 1 hr") && !o.contains("= 3 hr"), "{flag}: {o}");
+    }
+}
+
+#[test]
+fn week_start_sunday_moves_the_week_window() {
+    use chrono::Datelike;
+    let today = day(0);
+    let sunday_start = today - Duration::days(today.weekday().num_days_from_sunday() as i64);
+    let monday_start = today - Duration::days(today.weekday().num_days_from_monday() as i64);
+    // The earlier of the two week starts is inside exactly one window.
+    let probe = sunday_start.min(monday_start);
+    for (week_start, start) in [("sunday", sunday_start), ("monday", monday_start)] {
+        let dir = tempdir().unwrap();
+        fs::create_dir_all(dir.path().join("clocking")).unwrap();
+        fs::write(dir.path().join("clocking").join("clocking.toml"), format!("week_start = \"{week_start}\"\n")).unwrap();
+        write_log(dir.path(), &session_on(probe, "4 hr"));
+        let o = stdout(clocking(&["log", "--week"], dir.path()));
+        assert_eq!(o.contains("= 4 hr"), probe >= start, "{week_start}: {o}");
+    }
+}
+
+#[test]
+fn undo_with_nothing_to_undo() {
+    let dir = tempdir().unwrap();
+    clocking(&["undo"], dir.path()).success().stdout("nothing to undo\n");
+}
+
+#[test]
+fn bare_status_warns_when_over_max_session() {
+    let dir = tempdir().unwrap();
+    fs::create_dir_all(dir.path().join("clocking")).unwrap();
+    fs::write(dir.path().join("clocking").join("clocking.toml"), "max_session = 60\n").unwrap();
+    write_log(dir.path(), &open_marker_ago(90));
+    let o = stdout(clocking(&[], dir.path()));
+    assert!(o.contains("over max_session"), "{o}");
+    write_log(dir.path(), &open_marker_ago(30));
+    assert!(!stdout(clocking(&[], dir.path())).contains("over max_session"));
+}

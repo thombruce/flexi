@@ -119,3 +119,14 @@ fn completions_and_man_smoke() {
     assert!(out(holler(&["completions", "bash"], dir.path())).contains("holler"));
     assert!(out(holler(&["man"], dir.path())).contains("holler"));
 }
+
+#[test]
+fn config_path_overrides_the_data_file() {
+    let dir = tempdir().unwrap();
+    let custom = dir.path().join("elsewhere").join("custom.txt");
+    fs::create_dir_all(dir.path().join("holler")).unwrap();
+    fs::write(dir.path().join("holler").join("holler.toml"), format!("path = {:?}\n", custom.to_str().unwrap())).unwrap();
+    holler(&["add", "John", "Smith"], dir.path()).success();
+    assert!(fs::read_to_string(&custom).unwrap().contains("John Smith"));
+    assert!(!dir.path().join("holler").join("holler.txt").exists());
+}
