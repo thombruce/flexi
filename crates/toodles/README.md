@@ -78,7 +78,7 @@ Each line is `[STATUS ][(A) ][CLOSED ][CREATED ][DUE ]TITLE`:
 - Open and focused todos carry up to two dates: one is the created date, two are created then **due**.
 - Closed todos (done `x` or obsolete `~`) carry up to three: closed, created, then due — todo.txt's `x CLOSED CREATED`, with due appended.
 
-The number of dates is what identifies each one, so a due date needs a created date in front of it. `add` always stamps one, and `done` stamps (or, when reopening, clears) the closed date. Other todo.txt tools see the due date as part of the description, so the file stays readable by them.
+The closed date records when a todo got its current closed status: switching between done and obsolete (`done`/`wont`) stamps today again, so "didn't think I'd do it, but did" is dated by when you did. The number of dates is what identifies each one, so a due date needs a created date in front of it. `add` always stamps one, and `done` stamps (or, when reopening, clears) the closed date. Other todo.txt tools see the due date as part of the description, so the file stays readable by them.
 
 Like calchemy, there's no delimiter: a title that opens with a `YYYY-MM-DD`-shaped word, on a line with fewer dates than its maximum, has that word read as a date. A deliberate, accepted tradeoff rather than an escaping scheme. `add` guards against it: a title starting with a date is refused unless `--due` is given (which fills both date slots, so the title is safe). Dates may drop leading zeros in the month and day (`2030-1-5`, here and in `--due`), but the year must be 4 digits; looser shapes like `1-2-3` are plain title text. Dates are always written back padded.
 

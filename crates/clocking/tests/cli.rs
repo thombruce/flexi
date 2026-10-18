@@ -246,3 +246,10 @@ fn whitespace_only_tail_line_is_skipped() {
     clocking(&["out"], dir.path()).success();
     assert!(!read_log(dir.path()).contains("@in"));
 }
+
+#[test]
+fn since_uses_the_family_date_rule() {
+    let dir = tempdir().unwrap();
+    clocking(&["log", "--since", "1-2-3"], dir.path()).failure();
+    clocking(&["log", "--since", "2026-7-1"], dir.path()).success();
+}

@@ -4,9 +4,9 @@ mod storage;
 use anyhow::{Context, Result};
 use clap::{Args, CommandFactory, Parser, Subcommand};
 use clap_complete::{generate, Shell};
+use foolscap::prefix::Status;
 use foolscap::tags;
 use owo_colors::{OwoColorize, Stream::Stdout};
-use foolscap::prefix::Status;
 use storage::{Item, PriceFormat};
 
 #[derive(Parser)]
