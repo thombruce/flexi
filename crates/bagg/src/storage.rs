@@ -1,6 +1,8 @@
 use anyhow::Result;
 use std::path::Path;
 
+use foolscap::prefix::{Prefix, Status};
+
 use foolscap::read_lines;
 pub use foolscap::{append_line, remove_line, replace_line};
 
@@ -29,9 +31,10 @@ impl Default for PriceFormat {
 /// it guards against isn't specific to bare integers (see `Item` docs).
 pub const UNSPECIFIED_PRICE: &str = "?";
 
-/// One item, parsed from a line `[x ][(A) ][PRICE ]NAME[ xQTY]`.
+/// One item, parsed from a line `[STATUS ][(A) ][PRICE ]NAME[ xQTY]`.
 ///
-/// - Leading `x` marks the item as got; absent means not-got.
+/// - Leading `STATUS` (`foolscap::prefix`): `x` got, `!` buying this trip,
+///   `~` decided not to buy; absent means wanted.
 /// - `(A)`-`(Z)` is an optional priority.
 /// - `PRICE` is an optional decimal amount (e.g. `12.99`), stored in minor
 ///   units (cents), or the literal `?` for "unspecified". A NAME whose
@@ -49,7 +52,7 @@ pub const UNSPECIFIED_PRICE: &str = "?";
 ///   (`Eggs`) round-trips as plain text.
 #[derive(Debug, Clone, PartialEq)]
 pub struct Item {
-    pub got: bool,
+    pub status: Status,
     pub priority: Option<char>,
     pub price: Option<i32>,
     pub qty: u32,
@@ -63,17 +66,7 @@ impl Item {
         let mut tokens: Vec<&str> = line.split_whitespace().collect();
         anyhow::ensure!(!tokens.is_empty(), "empty line");
 
-        let got = if tokens.first() == Some(&"x") {
-            tokens.remove(0);
-            true
-        } else {
-            false
-        };
-
-        let priority = tokens.first().and_then(|t| parse_priority(t));
-        if priority.is_some() {
-            tokens.remove(0);
-        }
+        let Prefix { status, priority } = Prefix::take(&mut tokens);
 
         let price = if tokens.first() == Some(&UNSPECIFIED_PRICE) {
             tokens.remove(0);
@@ -93,13 +86,14 @@ impl Item {
         anyhow::ensure!(!tokens.is_empty(), "missing name in line: {:?}", line);
         let name = tokens.join(" ");
 
-        Ok(Item { got, priority, price, qty: qty.unwrap_or(1), name, raw: line.to_string() })
+        Ok(Item { status, priority, price, qty: qty.unwrap_or(1), name, raw: line.to_string() })
     }
 
-    /// Sort key: not-got before got, then priority A..Z (none last), then
-    /// price cheap-first (none last), stable on insertion order for ties.
-    pub fn sort_key(&self) -> (u8, u8, i32) {
-        let status = if self.got { 1 } else { 0 };
+    /// Sort key: focused (`!`), wanted, got (`x`), then won't-buy (`~`); then
+    /// priority A..Z (none last), then price cheap-first (none last), stable
+    /// on insertion order for ties.
+    pub fn sort_key(&self) -> (Status, u8, i32) {
+        let status = self.status;
         let priority = self.priority.map(|p| p as u8).unwrap_or(u8::MAX);
         let price = self.price.unwrap_or(i32::MAX);
         (status, priority, price)
@@ -112,13 +106,7 @@ impl Item {
     /// stays untouched. This applies for any `PriceFormat`, not just
     /// `places == 0` — a name can collide with a full decimal shape too.
     pub fn to_line(&self, fmt: PriceFormat, always_show_unspecified_price: bool) -> String {
-        let mut parts = Vec::new();
-        if self.got {
-            parts.push("x".to_string());
-        }
-        if let Some(p) = self.priority {
-            parts.push(format!("({})", p));
-        }
+        let mut parts = Prefix { status: self.status, priority: self.priority }.tokens();
         match self.price {
             Some(cents) => parts.push(format_price(cents, fmt)),
             None => {
@@ -134,15 +122,6 @@ impl Item {
             parts.push(format!("x{}", self.qty));
         }
         parts.join(" ")
-    }
-}
-
-fn parse_priority(s: &str) -> Option<char> {
-    let bytes = s.as_bytes();
-    if bytes.len() == 3 && bytes[0] == b'(' && bytes[2] == b')' && bytes[1].is_ascii_uppercase() {
-        Some(bytes[1] as char)
-    } else {
-        None
     }
 }
 
@@ -205,7 +184,7 @@ mod tests {
     #[test]
     fn parse_bare_name() {
         let i = item("Eggs");
-        assert!(!i.got);
+        assert_eq!(i.status, Status::Open);
         assert_eq!(i.priority, None);
         assert_eq!(i.price, None);
         assert_eq!(i.qty, 1);
@@ -215,7 +194,7 @@ mod tests {
     #[test]
     fn parse_all_fields() {
         let i = item("x (A) 12.99 Widget thing x2");
-        assert!(i.got);
+        assert_eq!(i.status, Status::Done);
         assert_eq!(i.priority, Some('A'));
         assert_eq!(i.price, Some(1299));
         assert_eq!(i.qty, 2);
@@ -241,8 +220,17 @@ mod tests {
     #[test]
     fn parse_got_only() {
         let i = item("x Got already");
-        assert!(i.got);
+        assert_eq!(i.status, Status::Done);
         assert_eq!(i.name, "Got already");
+    }
+
+    #[test]
+    fn parse_focus_and_obsolete() {
+        let i = item("! (A) 5.00 Coffee");
+        assert_eq!((i.status, i.priority, i.price), (Status::Focus, Some('A'), Some(500)));
+        let i = item("~ Gadget x2");
+        assert_eq!((i.status, i.qty, i.name.as_str()), (Status::Obsolete, 2, "Gadget"));
+        assert_eq!(item("!Bang").status, Status::Open);
     }
 
     #[test]
@@ -253,7 +241,7 @@ mod tests {
 
     #[test]
     fn to_line_omits_qty_when_one() {
-        let i = Item { got: false, priority: None, price: None, qty: 1, name: "Eggs".to_string(), raw: String::new() };
+        let i = Item { status: Status::Open, priority: None, price: None, qty: 1, name: "Eggs".to_string(), raw: String::new() };
         assert_eq!(line(&i), "Eggs");
     }
 
@@ -265,6 +253,8 @@ mod tests {
             "(B) Cheap thing, price unknown",
             "5.00 Coffee",
             "x (A) 12.99 Widget thing x2",
+            "! 5.00 Coffee",
+            "~ (B) Gadget x2",
         ] {
             assert_eq!(line(&item(l)), l);
         }
@@ -295,7 +285,9 @@ mod tests {
     fn sort_key_orders_status_then_priority_then_price() {
         let not_got = item("Eggs");
         let got = item("x Eggs");
+        assert!(item("! Eggs").sort_key() < item("(A) Eggs").sort_key());
         assert!(not_got.sort_key() < got.sort_key());
+        assert!(got.sort_key() < item("~ Eggs").sort_key());
 
         let high_pri = item("(A) Eggs");
         let low_pri = item("(B) Eggs");
@@ -379,7 +371,7 @@ mod tests {
         // a bare number would misparse as PRICE on the next read — to_line
         // must auto-insert `?` to stay safely re-parseable.
         let fmt = PriceFormat { separator: '.', places: 0 };
-        let i = Item { got: false, priority: None, price: None, qty: 1, name: "4 slice toaster".to_string(), raw: String::new() };
+        let i = Item { status: Status::Open, priority: None, price: None, qty: 1, name: "4 slice toaster".to_string(), raw: String::new() };
         let rendered = i.to_line(fmt, false);
         assert_eq!(rendered, "? 4 slice toaster");
         // And it round-trips safely from here on.
@@ -388,7 +380,7 @@ mod tests {
 
     #[test]
     fn to_line_omits_placeholder_when_no_collision() {
-        let i = Item { got: false, priority: None, price: None, qty: 1, name: "Eggs".to_string(), raw: String::new() };
+        let i = Item { status: Status::Open, priority: None, price: None, qty: 1, name: "Eggs".to_string(), raw: String::new() };
         assert_eq!(i.to_line(PriceFormat::default(), false), "Eggs");
         let fmt0 = PriceFormat { separator: '.', places: 0 };
         assert_eq!(i.to_line(fmt0, false), "Eggs");
@@ -399,7 +391,7 @@ mod tests {
         // Works under the default (decimal) config too -- not just
         // places == 0 -- so a user can always opt into visibly marking
         // every priceless item as a matter of preference.
-        let i = Item { got: false, priority: None, price: None, qty: 1, name: "Eggs".to_string(), raw: String::new() };
+        let i = Item { status: Status::Open, priority: None, price: None, qty: 1, name: "Eggs".to_string(), raw: String::new() };
         assert_eq!(i.to_line(PriceFormat::default(), true), "? Eggs");
 
         let fmt0 = PriceFormat { separator: '.', places: 0 };

@@ -54,7 +54,7 @@ bagg man                               # print the man page (roff) to stdout
 
 `$EDITOR` is run through `sh`, as git does (so `edit` isn't supported on Windows), and may carry arguments (`EDITOR="code -w"`). An editor path containing spaces must be quoted inside it: `EDITOR='"/Applications/Sublime Text.app/Contents/SharedSupport/bin/subl" -w'`.
 
-Items are always listed sorted, regardless of their order in the file: not-got before got, then priority `A` before `B` before none, then cheapest price before priciest before unpriced. `list --pending`/`--got` filter that same sorted listing without renumbering it — an item keeps the index it has in the full list even when a filter hides its neighbors, so `got`/`rm` always target what you expect.
+Items are always listed sorted, regardless of their order in the file: `!` items first, then wanted, then got, then `~` won't-buy; then priority `A` before `B` before none, then cheapest price before priciest before unpriced. `list --pending`/`--got` filter that same sorted listing without renumbering it — an item keeps the index it has in the full list even when a filter hides its neighbors, so `got`/`rm` always target what you expect.
 
 `list` also takes `+project`, `@context`, `#hashtag`, or `key:value` tag queries (e.g. `bagg list +kitchen-reno @tesco '#gift'`), matched case-insensitively against tags embedded anywhere in an item's name — multiple queries match if the item carries any of them. Tags aren't a separate stored field; they're plain words in `NAME` (`Screws +kitchen-reno`), parsed on the fly when filtering, todo.txt's own convention. This is also the answer to "how do I group related items" (e.g. several parts for one project) — tag them all with the same `+project`, no nesting needed. A `#hashtag` must start with a letter (`#42` isn't one), and must be quoted on the command line (`'#urgent'`), or the shell treats it as a comment.
 
@@ -70,9 +70,9 @@ Eggs
 x Got already
 ```
 
-Each line is `[x ][(A) ][PRICE ]NAME[ xQTY]`:
+Each line is `[STATUS ][(A) ][PRICE ]NAME[ xQTY]`:
 
-- A leading `x` marks the item as got (todo.txt convention); absent means not-got. No placeholder token is needed for "not got".
+- `STATUS` is an optional leading marker, at most one: `x` got (todo.txt convention), `!` buying this trip, or `~` decided not to buy (kept for the record rather than removed). No marker means wanted. Each must be a word on its own, so `!Bang` is part of the name.
 - `(A)`–`(Z)` is an optional priority. Unbounded — there's no fixed set of levels, and no priority sorts after any lettered one.
 - `PRICE` is an optional decimal amount, or the literal `?` for "deliberately unspecified". By default it's written with a `.` and 2 decimal places (e.g. `12.99`) — that's what lets it be told apart from a bare integer, which is never a price. Both the separator and the decimal-place count are configurable (see Configuration) for other locales/currencies.
 - `NAME` is required free text — a URL, a store name, a note, all just live in the name itself.
