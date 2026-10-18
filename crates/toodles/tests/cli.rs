@@ -17,6 +17,11 @@ fn write_log(dir: &Path, content: &str) {
     fs::write(dir.join("toodles").join("toodles.txt"), content).unwrap();
 }
 
+fn write_config(dir: &Path, content: &str) {
+    fs::create_dir_all(dir.join("toodles")).unwrap();
+    fs::write(dir.join("toodles").join("toodles.toml"), content).unwrap();
+}
+
 fn read_log(dir: &Path) -> String {
     fs::read_to_string(dir.join("toodles").join("toodles.txt")).unwrap()
 }
@@ -213,8 +218,7 @@ fn moving_between_done_and_wont_restamps_the_closed_date() {
 fn config_path_overrides_the_data_file() {
     let dir = tempdir().unwrap();
     let custom = dir.path().join("elsewhere").join("custom.txt");
-    fs::create_dir_all(dir.path().join("toodles")).unwrap();
-    fs::write(dir.path().join("toodles").join("toodles.toml"), format!("path = {:?}\n", custom.to_str().unwrap())).unwrap();
+    write_config(dir.path(), &format!("path = '{}'\n", custom.display()));
     toodles(&["add", "Call", "mum"], dir.path()).success();
     assert!(fs::read_to_string(&custom).unwrap().contains("Call mum"));
     assert!(!dir.path().join("toodles").join("toodles.txt").exists());

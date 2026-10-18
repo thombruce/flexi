@@ -212,8 +212,7 @@ fn focus_and_wont_toggle_and_filter() {
 fn config_path_overrides_the_data_file() {
     let dir = tempdir().unwrap();
     let custom = dir.path().join("elsewhere").join("custom.txt");
-    fs::create_dir_all(dir.path().join("bagg")).unwrap();
-    fs::write(dir.path().join("bagg").join("bagg.toml"), format!("path = {:?}\n", custom.to_str().unwrap())).unwrap();
+    write_config(dir.path(), &format!("path = '{}'\n", custom.display()));
     bagg(&["add", "Eggs"], dir.path()).success();
     assert!(fs::read_to_string(&custom).unwrap().contains("Eggs"));
     assert!(!dir.path().join("bagg").join("bagg.txt").exists());

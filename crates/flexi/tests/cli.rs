@@ -568,8 +568,7 @@ fn prose_conflicts_with_summary() {
 #[test]
 fn log_filter_week_start_sunday() {
     let dir = tempdir().unwrap();
-    fs::create_dir_all(dir.path().join("flexi")).unwrap();
-    fs::write(dir.path().join("flexi").join("flexi.toml"), "week_start = \"sunday\"\n").unwrap();
+    write_config(dir.path(), "week_start = \"sunday\"\n");
     write_log(dir.path(), "2020-01-01 09:00 = 1 hr\n");
     flexi(&["add", "30", "min"], dir.path()).success();
     let lines = log_lines(dir.path(), &["--week"]);
@@ -1174,8 +1173,7 @@ fn since_uses_the_family_date_rule() {
 fn config_path_overrides_the_data_file() {
     let dir = tempdir().unwrap();
     let custom = dir.path().join("elsewhere").join("custom.txt");
-    fs::create_dir_all(dir.path().join("flexi")).unwrap();
-    fs::write(dir.path().join("flexi").join("flexi.toml"), format!("path = {:?}\n", custom.to_str().unwrap())).unwrap();
+    write_config(dir.path(), &format!("path = '{}'\n", custom.display()));
     flexi(&["add", "30", "min"], dir.path()).success();
     assert!(fs::read_to_string(&custom).unwrap().contains("+30 min"));
     assert!(!dir.path().join("flexi").join("flexi.txt").exists());

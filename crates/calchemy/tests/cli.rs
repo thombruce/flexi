@@ -18,6 +18,11 @@ fn write_log(dir: &Path, content: &str) {
     fs::write(dir.join("calchemy").join("calchemy.txt"), content).unwrap();
 }
 
+fn write_config(dir: &Path, content: &str) {
+    fs::create_dir_all(dir.join("calchemy")).unwrap();
+    fs::write(dir.join("calchemy").join("calchemy.toml"), content).unwrap();
+}
+
 fn read_log(dir: &Path) -> String {
     fs::read_to_string(dir.join("calchemy").join("calchemy.txt")).unwrap()
 }
@@ -238,29 +243,39 @@ fn completions_and_man_smoke() {
 fn config_path_overrides_the_data_file() {
     let dir = tempdir().unwrap();
     let custom = dir.path().join("elsewhere").join("custom.txt");
-    fs::create_dir_all(dir.path().join("calchemy")).unwrap();
-    fs::write(dir.path().join("calchemy").join("calchemy.toml"), format!("path = {:?}\n", custom.to_str().unwrap())).unwrap();
+    write_config(dir.path(), &format!("path = '{}'\n", custom.display()));
     calchemy(&["add", "2030-01-05", "Dentist"], dir.path()).success();
     assert!(fs::read_to_string(&custom).unwrap().contains("2030-01-05 Dentist"));
     assert!(!dir.path().join("calchemy").join("calchemy.txt").exists());
 }
 
+/// The most recent `weekday` on or before `date`, found by stepping back a
+/// day at a time (deliberately not the code's `num_days_from_*` formula).
+fn last(weekday: chrono::Weekday, mut date: NaiveDate) -> NaiveDate {
+    while date.weekday() != weekday {
+        date = date.pred_opt().unwrap();
+    }
+    date
+}
+
 #[test]
 fn week_start_sunday_moves_the_week() {
     let today = Local::now().date_naive();
-    let start = |from_start: u32| today - Duration::days(from_start as i64);
-    let sunday_start = start(today.weekday().num_days_from_sunday());
-    let monday_start = start(today.weekday().num_days_from_monday());
+    let sunday_start = last(chrono::Weekday::Sun, today);
+    let monday_start = last(chrono::Weekday::Mon, today);
     let in_week = |s: NaiveDate, d: NaiveDate| d >= s && d <= s + Duration::days(6);
     // A day in the Sunday-start week but not the Monday-start one always exists.
     let probe = (0..7).map(|i| sunday_start + Duration::days(i)).find(|d| !in_week(monday_start, *d)).unwrap();
     let line = format!("{} Probe\n", probe.format("%Y-%m-%d"));
     for (week_start, shown) in [("sunday", true), ("monday", false)] {
         let dir = tempdir().unwrap();
-        fs::create_dir_all(dir.path().join("calchemy")).unwrap();
-        fs::write(dir.path().join("calchemy").join("calchemy.toml"), format!("week_start = \"{week_start}\"\n")).unwrap();
+        write_config(dir.path(), &format!("week_start = \"{week_start}\"\n"));
         write_log(dir.path(), &line);
         let o = out(calchemy(&["week"], dir.path()));
+        // ponytail: skip if midnight passed mid-test (the binary read a different date)
+        if Local::now().date_naive() != today {
+            return;
+        }
         assert_eq!(o.contains("Probe"), shown, "{week_start}: {o}");
     }
 }
