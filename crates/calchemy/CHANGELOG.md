@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- Dates and times follow one rule, in the file and on the command line: a 4-digit year with a 1–2 digit month and day (`2030-1-5`), and a 1–2 digit hour with 2-digit minutes (`9:00`). Previously anything chrono accepted counted, including `1-2-3` (the year 1), `24-1-5`, `+2030-01-05` and `9:5`; those are now plain title text. Dates and times are still written padded.
+
+### Fixed
+
+- A title starting with a date-like word (e.g. `2030-01-05 1-2-3 go`) no longer fails the whole file with "end date not after start". In the file, an end that isn't after the start is now left as title text.
+
 ### Added
 
 - `list` tag queries now also match `#hashtag` tags (a `#` followed by a word starting with a letter, e.g. `#urgent`; `#42` isn't one). Quote it on the command line (`list '#urgent'`), or the shell treats it as a comment.

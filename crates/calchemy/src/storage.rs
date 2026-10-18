@@ -41,18 +41,22 @@ impl Appt {
         // Longest shape-match first: `TIME DATE TIME` (start day/time to a
         // later end day/time), then `TIME TIME` (same-day end), then a lone
         // `TIME` (start only) or `DATE` (bare end date, multi-day all-day).
+        // An end that isn't after the start doesn't fit, so it isn't claimed
+        // and stays title text, rather than failing the whole file.
+        let later_end = |s: &str, ed: &str, et: &str| -> Option<NaiveDateTime> {
+            let end = parse_date(ed).ok()?.and_time(parse_time(et).ok()?);
+            (end > date.and_time(parse_time(s).ok()?)).then_some(end)
+        };
         let (start, end, consumed) = match rest {
-            [s, ed, et, ..] if parse_time(s).is_ok() && parse_date(ed).is_ok() && parse_time(et).is_ok() => {
-                (Some(parse_time(s)?), Some(parse_date(ed)?.and_time(parse_time(et)?)), 3)
+            [s, ed, et, ..] if later_end(s, ed, et).is_some() => {
+                (Some(parse_time(s)?), later_end(s, ed, et), 3)
             }
             [s, e, ..] if parse_time(s).is_ok() && parse_time(e).is_ok() => {
                 (Some(parse_time(s)?), Some(date.and_time(parse_time(e)?)), 2)
             }
             [s, ..] if parse_time(s).is_ok() => (Some(parse_time(s)?), None, 1),
-            [ed, ..] if parse_date(ed).is_ok() => {
-                let end_date = parse_date(ed)?;
-                anyhow::ensure!(end_date > date, "end date not after start in line: {:?}", line);
-                (None, Some(end_date.and_time(NaiveTime::MIN)), 1)
+            [ed, ..] if parse_date(ed).is_ok_and(|end_date| end_date > date) => {
+                (None, Some(parse_date(ed)?.and_time(NaiveTime::MIN)), 1)
             }
             _ => (None, None, 0),
         };
@@ -93,11 +97,11 @@ impl Appt {
 }
 
 fn parse_time(s: &str) -> Result<NaiveTime> {
-    NaiveTime::parse_from_str(s, "%H:%M").with_context(|| format!("invalid time {:?}", s))
+    foolscap::dates::parse_time(s).with_context(|| format!("invalid time {:?}", s))
 }
 
 fn parse_date(s: &str) -> Result<NaiveDate> {
-    NaiveDate::parse_from_str(s, "%Y-%m-%d").with_context(|| format!("invalid date {:?}", s))
+    foolscap::dates::parse_date(s).with_context(|| format!("invalid date {:?}", s))
 }
 
 pub fn read_appts(path: &Path) -> Result<Vec<Appt>> {
@@ -149,9 +153,31 @@ mod tests {
     }
 
     #[test]
-    fn parse_rejects_end_date_not_after_start() {
-        assert!(Appt::parse("2026-07-17 2026-07-17 x").is_err());
-        assert!(Appt::parse("2026-07-17 2026-07-16 x").is_err());
+    fn end_not_after_start_stays_title_text() {
+        let a = Appt::parse("2026-07-17 2026-07-17 x").unwrap();
+        assert_eq!((a.end, a.title.as_str()), (None, "2026-07-17 x"));
+        let a = Appt::parse("2026-07-17 2026-07-16 retro").unwrap();
+        assert_eq!((a.end, a.title.as_str()), (None, "2026-07-16 retro"));
+        // A timed end on an earlier day isn't claimed either; the start time still is.
+        let a = Appt::parse("2026-07-17 09:00 2026-07-16 10:00 x").unwrap();
+        assert_eq!(a.start, foolscap::dates::parse_time("09:00"));
+        assert_eq!((a.end, a.title.as_str()), (None, "2026-07-16 10:00 x"));
+    }
+
+    #[test]
+    fn loose_date_shapes_are_title_text() {
+        // Previously `1-2-3` was claimed as an end date in the year 1 and
+        // failed the whole file.
+        let a = Appt::parse("2030-01-05 1-2-3 go").unwrap();
+        assert_eq!((a.end, a.title.as_str()), (None, "1-2-3 go"));
+        let a = Appt::parse("2030-01-05 9:5 sync").unwrap();
+        assert_eq!((a.start, a.title.as_str()), (None, "9:5 sync"));
+    }
+
+    #[test]
+    fn bounded_unpadded_dates_and_times_parse() {
+        let a = Appt::parse("2030-1-5 9:00 Dentist").unwrap();
+        assert_eq!(a.to_line(), "2030-01-05 09:00 Dentist");
     }
 
     #[test]

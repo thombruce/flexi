@@ -1,5 +1,6 @@
 use anyhow::Result;
 use chrono::NaiveDate;
+pub use foolscap::dates::parse_date;
 use foolscap::prefix::{Prefix, Status};
 use std::path::Path;
 
@@ -83,15 +84,6 @@ impl Todo {
     }
 }
 
-/// Strict `YYYY-MM-DD`: chrono alone also accepts unpadded `2024-9-1`, which
-/// would widen the set of title words misclaimed as dates.
-pub fn parse_date(s: &str) -> Option<NaiveDate> {
-    if s.len() != 10 {
-        return None;
-    }
-    NaiveDate::parse_from_str(s, "%Y-%m-%d").ok()
-}
-
 pub fn read_todos(path: &Path) -> Result<Vec<Todo>> {
     read_lines(path)?.iter().map(|l| Todo::parse(l)).collect()
 }
@@ -158,10 +150,12 @@ mod tests {
     }
 
     #[test]
-    fn unpadded_date_is_title_text() {
+    fn bounded_unpadded_dates_parse_and_loose_ones_are_title_text() {
         let t = todo("2024-9-1 Thing");
-        assert_eq!(t.created, None);
-        assert_eq!(t.title, "2024-9-1 Thing");
+        assert_eq!(t.created, d("2024-09-01"));
+        assert_eq!(t.to_line(), "2024-09-01 Thing");
+        let t = todo("1-2-3 go");
+        assert_eq!((t.created, t.title.as_str()), (None, "1-2-3 go"));
     }
 
     #[test]

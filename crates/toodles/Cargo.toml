@@ -13,7 +13,7 @@ name = "toodles"
 path = "src/main.rs"
 
 [dependencies]
-foolscap = { path = "../foolscap", version = "0.1.1" }
+foolscap = { path = "../foolscap", version = "0.1.1", features = ["dates"] }
 anyhow = "1"
 chrono = "0.4"
 clap = { version = "4", features = ["derive"] }

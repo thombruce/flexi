@@ -8,9 +8,14 @@ repository = "https://github.com/thombruce/flexi"
 
 [dependencies]
 anyhow = "1"
+chrono = { version = "0.4", optional = true }
 dirs = "5"
 serde = "1"
 toml = "0.8"
+
+[features]
+# Date/time parsing; pulls in chrono, so only tools with dates enable it.
+dates = ["dep:chrono"]
 
 [dev-dependencies]
 tempfile = "3"

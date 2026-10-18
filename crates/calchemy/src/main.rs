@@ -85,7 +85,7 @@ struct ApptFilter {
 }
 
 fn parse_date(s: &str) -> Result<NaiveDate> {
-    NaiveDate::parse_from_str(s, "%Y-%m-%d").with_context(|| format!("invalid date {:?}, expected YYYY-MM-DD", s))
+    foolscap::dates::parse_date(s).with_context(|| format!("invalid date {:?}, expected YYYY-MM-DD", s))
 }
 
 /// Parses a CLI time argument: `HH:MM` or `HH:MM-HH:MM`. Returns None if `s`
@@ -93,11 +93,11 @@ fn parse_date(s: &str) -> Result<NaiveDate> {
 fn parse_time_arg(s: &str) -> Option<(NaiveTime, Option<NaiveTime>)> {
     match s.split_once('-') {
         Some((a, b)) => {
-            let start = NaiveTime::parse_from_str(a, "%H:%M").ok()?;
-            let end = NaiveTime::parse_from_str(b, "%H:%M").ok()?;
+            let start = foolscap::dates::parse_time(a)?;
+            let end = foolscap::dates::parse_time(b)?;
             Some((start, Some(end)))
         }
-        None => Some((NaiveTime::parse_from_str(s, "%H:%M").ok()?, None)),
+        None => Some((foolscap::dates::parse_time(s)?, None)),
     }
 }
 
@@ -277,8 +277,8 @@ fn main() -> Result<()> {
                     // end on a later day.
                     let explicit_end = (e.is_none() && rest.len() >= 3)
                         .then(|| {
-                            let ed = NaiveDate::parse_from_str(&rest[1], "%Y-%m-%d").ok()?;
-                            let et = NaiveTime::parse_from_str(&rest[2], "%H:%M").ok()?;
+                            let ed = foolscap::dates::parse_date(&rest[1])?;
+                            let et = foolscap::dates::parse_time(&rest[2])?;
                             Some(ed.and_time(et))
                         })
                         .flatten();
@@ -293,7 +293,7 @@ fn main() -> Result<()> {
                         });
                         (Some(s), end, &rest[1..])
                     }
-                } else if let Ok(end_date) = NaiveDate::parse_from_str(&rest[0], "%Y-%m-%d") {
+                } else if let Some(end_date) = foolscap::dates::parse_date(&rest[0]) {
                     anyhow::ensure!(end_date > date, "end date {} must be after {}", end_date, date);
                     (None, Some(end_date.and_time(NaiveTime::MIN)), &rest[1..])
                 } else {
