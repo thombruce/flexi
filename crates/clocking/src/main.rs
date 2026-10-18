@@ -15,28 +15,18 @@ struct Cli {
     command: Option<Commands>,
 }
 
-fn parse_note(s: &str) -> Result<String, String> {
-    if s.contains('\n') || s.contains('\r') {
-        return Err("note must not contain newlines".to_string());
-    }
-    if s.trim().is_empty() {
-        return Err("note must not be empty".to_string());
-    }
-    Ok(s.to_string())
-}
-
 #[derive(Subcommand)]
 enum Commands {
     /// Clock in — start a work session
     In {
         /// Attach a note to this session
-        #[arg(long, short = 'm', value_parser = parse_note)]
+        #[arg(long, short = 'm', value_parser = foolscap::note::parse)]
         note: Option<String>,
     },
     /// Clock out — close the open session and record the hours worked
     Out {
         /// Attach a note to this log entry
-        #[arg(long, short = 'm', value_parser = parse_note)]
+        #[arg(long, short = 'm', value_parser = foolscap::note::parse)]
         note: Option<String>,
         /// Record the session even if it exceeds `max_session`
         #[arg(long)]
@@ -120,10 +110,7 @@ fn worked(mins: i32) -> String {
 
 fn print_log_entry(entry: &storage::LogEntry) {
     let ts = entry.timestamp.get(..16).unwrap_or(&entry.timestamp).replace('T', " ");
-    let (body, note) = match entry.description.split_once(" # ") {
-        Some((b, n)) => (b.to_string(), Some(n.to_string())),
-        None => (entry.description.clone(), None),
-    };
+    let (body, note) = foolscap::note::split(&entry.description);
     let rendered = if entry.is_open() {
         format!("clocked in {} (open)", ts.get(11..).unwrap_or(""))
             .if_supports_color(Stdout, |t| t.yellow())
@@ -255,9 +242,7 @@ fn main() -> Result<()> {
                 anyhow::bail!("already clocked in since {} — run `clocking out` first", start.format("%H:%M"));
             }
             let mut desc = "@in".to_string();
-            if let Some(n) = note {
-                desc.push_str(&format!(" # {}", n));
-            }
+            foolscap::note::append(&mut desc, note.as_deref());
             storage::append_log(&cfg.path, &storage::now_timestamp(cfg.timestamp_format), &desc)?;
             println!("clocked in at {}", chrono::Local::now().format("%H:%M"));
         }
@@ -294,10 +279,10 @@ fn main() -> Result<()> {
             };
             let mut desc = format!("{} = {}", end_field, time::format_duration(elapsed));
             // Keep both the clock-in note and any clock-out `-m` note; don't drop either.
-            let open_note = entry.description.split_once(" # ").map(|(_, n)| n.to_string());
+            let open_note = foolscap::note::split(&entry.description).1.map(str::to_string);
             let extra: Vec<String> = [open_note, note].into_iter().flatten().collect();
             if !extra.is_empty() {
-                desc.push_str(&format!(" # {}", extra.join("; ")));
+                foolscap::note::append(&mut desc, Some(&extra.join("; ")));
             }
             // Key the closed line by the clock-in timestamp (the marker's), not now.
             storage::pop_log(&cfg.path)?;

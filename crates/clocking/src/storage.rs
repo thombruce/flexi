@@ -10,7 +10,7 @@ pub struct LogEntry {
 
 impl LogEntry {
     fn body(&self) -> &str {
-        self.description.split(" # ").next().unwrap_or(&self.description)
+        foolscap::note::split(&self.description).0
     }
 
     /// True if this entry is an open session marker (`@in`).

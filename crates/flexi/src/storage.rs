@@ -10,7 +10,7 @@ pub struct LogEntry {
 
 impl LogEntry {
     pub fn delta_minutes(&self) -> Option<i32> {
-        let base = self.description.split(" # ").next().unwrap_or(&self.description);
+        let base = foolscap::note::split(&self.description).0;
         let desc = base
             .replace(" -> ", " > ")
             .replace(" \u{2192} ", " > ");
@@ -19,7 +19,7 @@ impl LogEntry {
     }
 
     pub fn new_minutes(&self) -> Result<i32> {
-        let desc = self.description.split(" # ").next().unwrap_or(&self.description);
+        let desc = foolscap::note::split(&self.description).0;
         if let Some(pos) = desc.rfind(" > ") {
             parse_duration(&desc[pos + 3..])
         } else if let Some(pos) = desc.rfind(" \u{2192} ") {
@@ -38,7 +38,7 @@ impl LogEntry {
     }
 
     fn marker_body(&self) -> &str {
-        self.description.split(" # ").next().unwrap_or(&self.description)
+        foolscap::note::split(&self.description).0
     }
 
     /// True if this entry is an open session marker (`@in`/`@out <balance>`).
