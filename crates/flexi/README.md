@@ -66,7 +66,7 @@ flexi completions <shell>  # print shell completion script
 flexi man                  # print the man page (roff) to stdout
 ```
 
-`$EDITOR` is run through `sh`, as git does, so it may carry arguments (`EDITOR="code -w"`). An editor path containing spaces must be quoted inside it: `EDITOR='"/Applications/Sublime Text.app/Contents/SharedSupport/bin/subl" -w'`.
+`$EDITOR` is run through `sh`, as git does (so `edit` isn't supported on Windows), and may carry arguments (`EDITOR="code -w"`). An editor path containing spaces must be quoted inside it: `EDITOR='"/Applications/Sublime Text.app/Contents/SharedSupport/bin/subl" -w'`.
 
 `add` and `remove` print the change and new balance (e.g. `+1 hr 30 min → 3 hr`). `set` and `reset` print the new balance. `note` records a dated, described entry with a `+0 min` change, leaving the balance untouched (useful for marking leave days, approvals, or reconciliation checkpoints); it is excluded from `--summary` and `--prose` totals. `log` prints one entry per line: `2026-05-24 10:20  +1 hr 30 min → 3 hr`. Notes appear dimmed at the end: `2026-05-24 10:20  +1 hr 30 min → 3 hr  # reason`.
 

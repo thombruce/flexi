@@ -138,3 +138,17 @@ fn edit_warns_but_succeeds_on_editor_failure() {
         .success()
         .stderr(predicates::str::contains("warning: editor"));
 }
+
+#[test]
+fn edit_works_before_the_first_add() {
+    let dir = tempdir().unwrap();
+    Command::cargo_bin("toodles")
+        .unwrap()
+        .env("XDG_DATA_HOME", dir.path())
+        .env("XDG_CONFIG_HOME", dir.path())
+        .env("EDITOR", "echo Fresh >")
+        .arg("edit")
+        .assert()
+        .success();
+    assert_eq!(read_log(dir.path()).trim(), "Fresh");
+}

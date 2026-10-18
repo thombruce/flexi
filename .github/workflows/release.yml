@@ -93,7 +93,9 @@ jobs:
 
   release:
     name: Create Release
-    needs: build
+    # Gated on crates.io too, so a failed publish (e.g. a bin tagged before the
+    # foolscap version it needs is on crates.io) ships no Release or formula.
+    needs: [build, publish-crate]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/download-artifact@v5

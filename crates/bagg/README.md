@@ -52,7 +52,7 @@ bagg completions <shell>                # print a shell completion script
 bagg man                               # print the man page (roff) to stdout
 ```
 
-`$EDITOR` is run through `sh`, as git does, so it may carry arguments (`EDITOR="code -w"`). An editor path containing spaces must be quoted inside it: `EDITOR='"/Applications/Sublime Text.app/Contents/SharedSupport/bin/subl" -w'`.
+`$EDITOR` is run through `sh`, as git does (so `edit` isn't supported on Windows), and may carry arguments (`EDITOR="code -w"`). An editor path containing spaces must be quoted inside it: `EDITOR='"/Applications/Sublime Text.app/Contents/SharedSupport/bin/subl" -w'`.
 
 Items are always listed sorted, regardless of their order in the file: not-got before got, then priority `A` before `B` before none, then cheapest price before priciest before unpriced. `list --pending`/`--got` filter that same sorted listing without renumbering it — an item keeps the index it has in the full list even when a filter hides its neighbors, so `got`/`rm` always target what you expect.
 

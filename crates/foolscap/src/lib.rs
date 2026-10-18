@@ -79,7 +79,8 @@ pub fn append_line(path: &Path, line: &str) -> Result<()> {
     writeln!(file, "{prefix}{line}").with_context(|| format!("writing {:?}", path))
 }
 
-/// Rewrites the file to exactly `lines` (atomic via a `.tmp` swap).
+/// Rewrites the file to exactly `lines` (atomic via a `.tmp` swap, synced
+/// to disk before the rename).
 pub fn write_lines(path: &Path, lines: &[String]) -> Result<()> {
     create_parent(path)?;
     // Append rather than replace the extension, so `a.txt` and `a.todo`
@@ -91,7 +92,12 @@ pub fn write_lines(path: &Path, lines: &[String]) -> Result<()> {
     if !content.is_empty() {
         content.push('\n');
     }
-    std::fs::write(&tmp, content).with_context(|| format!("writing {:?}", tmp))?;
+    let mut file = std::fs::File::create(&tmp).with_context(|| format!("creating {:?}", tmp))?;
+    // Flush to disk before the rename, so a crash can't leave the renamed
+    // file empty or truncated.
+    file.write_all(content.as_bytes())
+        .and_then(|_| file.sync_all())
+        .with_context(|| format!("writing {:?}", tmp))?;
     std::fs::rename(&tmp, path).with_context(|| format!("renaming {:?} to {:?}", tmp, path))
 }
 
@@ -119,8 +125,12 @@ pub fn replace_line(path: &Path, old_raw: &str, new_line: &str) -> Result<()> {
 /// An editor path with spaces must be quoted inside `$EDITOR`. Exit 126/127
 /// (shell couldn't run the editor) is an error; any other non-zero exit
 /// only warns, since the file is already saved by then and vim exits
-/// non-zero for things like a vimrc error.
+/// non-zero for things like a vimrc error. Requires `sh`, so `edit` doesn't
+/// work on Windows.
 pub fn open_in_editor(path: &Path) -> Result<()> {
+    // On a fresh install the data directory doesn't exist yet, so the
+    // editor couldn't save.
+    create_parent(path)?;
     let editor = std::env::var("EDITOR").ok().filter(|e| !e.trim().is_empty()).unwrap_or_else(|| "vi".to_string());
     let status = std::process::Command::new("sh")
         .arg("-c")

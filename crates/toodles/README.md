@@ -51,7 +51,7 @@ toodles completions <shell>               # print a shell completion script
 toodles man                               # print the man page (roff) to stdout
 ```
 
-`$EDITOR` is run through `sh`, as git does, so it may carry arguments (`EDITOR="code -w"`). An editor path containing spaces must be quoted inside it: `EDITOR='"/Applications/Sublime Text.app/Contents/SharedSupport/bin/subl" -w'`.
+`$EDITOR` is run through `sh`, as git does (so `edit` isn't supported on Windows), and may carry arguments (`EDITOR="code -w"`). An editor path containing spaces must be quoted inside it: `EDITOR='"/Applications/Sublime Text.app/Contents/SharedSupport/bin/subl" -w'`.
 
 Todos are always listed sorted, regardless of their order in the file: open before done, then priority `A` before `B` before none, then soonest due date before later before undated. Open todos past their due date are shown in red. `--open`/`--done` and tag queries filter that same sorted listing without renumbering it, so `done`/`rm` always target what you expect.
 
