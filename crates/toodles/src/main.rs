@@ -1,11 +1,11 @@
 mod config;
 mod storage;
-mod tags;
 
 use anyhow::{Context, Result};
 use chrono::{Local, NaiveDate};
 use clap::{Args, CommandFactory, Parser, Subcommand};
 use clap_complete::{generate, Shell};
+use foolscap::tags;
 use owo_colors::{OwoColorize, Stream::Stdout};
 use storage::Todo;
 

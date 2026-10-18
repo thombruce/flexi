@@ -1,7 +1,10 @@
 //! Plumbing shared by the flexi family of plaintext tools: XDG path
 //! discovery, toml config loading, line-oriented file I/O with atomic
-//! rewrites, and `$EDITOR` launching. Deliberately minimal — per-tool config
+//! rewrites, `$EDITOR` launching, and opt-in building blocks for parsing
+//! records (`tags`). Deliberately minimal — per-tool config
 //! structs, validation, and storage semantics stay in each tool's crate.
+
+pub mod tags;
 
 use anyhow::{Context, Result};
 use serde::de::DeserializeOwned;

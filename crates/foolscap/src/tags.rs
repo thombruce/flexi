@@ -1,3 +1,5 @@
+//! Todo.txt-style tags in free text: `+project`, `@context`, `key:value`.
+
 /// Extracts a `+project`, `@context`, or `key:value` tag from a single
 /// whitespace token, if it's shaped like one. The key of a `key:value` pair
 /// must start with a letter — this excludes a bare numeric token (e.g. a
