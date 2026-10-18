@@ -13,4 +13,5 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `toodles add [--priority A-Z] [--due YYYY-MM-DD] <title...>` adds a todo, always stamping today as the created date.
 - Bare `toodles` and `toodles list` show every todo, sorted; `--open`/`--done` and `+project`/`@context`/`key:value` tag queries filter the view without renumbering. Open todos past their due date are shown in red.
 - `toodles done <n>` toggles done/open in place, stamping (or clearing) the closed date; priority is kept on completion.
+- `add` refuses a title that starts with a date unless `--due` is given, since the date would otherwise be read back as the due date. Dates must be zero-padded `YYYY-MM-DD`; `2024-9-1` is plain title text.
 - `toodles rm <n>`, `toodles edit`, `toodles completions <shell>`, `toodles man`.

@@ -102,7 +102,12 @@ fn parse_priority(s: &str) -> Option<char> {
     }
 }
 
+/// Strict `YYYY-MM-DD`: chrono alone also accepts unpadded `2024-9-1`, which
+/// would widen the set of title words misclaimed as dates.
 pub fn parse_date(s: &str) -> Option<NaiveDate> {
+    if s.len() != 10 {
+        return None;
+    }
     NaiveDate::parse_from_str(s, "%Y-%m-%d").ok()
 }
 
@@ -212,6 +217,13 @@ mod tests {
     fn open_line_never_claims_a_third_date() {
         let t = todo("2024-09-01 2024-09-30 2024-10-01 is the launch");
         assert_eq!(t.title, "2024-10-01 is the launch");
+    }
+
+    #[test]
+    fn unpadded_date_is_title_text() {
+        let t = todo("2024-9-1 Thing");
+        assert_eq!(t.created, None);
+        assert_eq!(t.title, "2024-9-1 Thing");
     }
 
     #[test]

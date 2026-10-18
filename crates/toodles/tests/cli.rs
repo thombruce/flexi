@@ -44,6 +44,14 @@ fn add_rejects_bad_due_and_priority() {
 }
 
 #[test]
+fn add_refuses_date_leading_title_without_due() {
+    let dir = tempdir().unwrap();
+    toodles(&["add", "2024-12-25", "party"], dir.path()).failure();
+    toodles(&["add", "--due", "2030-01-01", "2024-12-25", "party"], dir.path()).success();
+    assert_eq!(read_log(dir.path()).trim(), format!("{} 2030-01-01 2024-12-25 party", today()));
+}
+
+#[test]
 fn list_sorts_by_status_then_priority_then_due() {
     let dir = tempdir().unwrap();
     write_log(

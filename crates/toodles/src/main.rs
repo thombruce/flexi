@@ -153,6 +153,11 @@ fn main() -> Result<()> {
             let title = title.join(" ");
             anyhow::ensure!(!title.trim().is_empty(), "a todo needs a title");
             anyhow::ensure!(!title.contains(['\n', '\r']), "title must not contain newlines");
+            // Without --due, a date-leading title would land in the due slot on re-read.
+            anyhow::ensure!(
+                due.is_some() || title.split_whitespace().next().and_then(storage::parse_date).is_none(),
+                "title starts with a date, which would be read as the due date — pass --due, or add it with `toodles edit`"
+            );
             // Created is always stamped: a due date is only expressible after one.
             let todo = Todo { done: false, priority, closed: None, created: Some(today), due, title, raw: String::new() };
             let line = todo.to_line();

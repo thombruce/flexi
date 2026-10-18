@@ -72,7 +72,7 @@ Each line is `[x ][(A) ][CLOSED ][CREATED ][DUE ]TITLE`:
 
 The number of dates is what identifies each one, so a due date needs a created date in front of it. `add` always stamps one, and `done` stamps (or, when reopening, clears) the closed date. Other todo.txt tools see the due date as part of the description, so the file stays readable by them.
 
-Like calchemy, there's no delimiter: a title that opens with a `YYYY-MM-DD`-shaped word, on a line with fewer dates than its maximum, has that word read as a date. A deliberate, accepted tradeoff rather than an escaping scheme.
+Like calchemy, there's no delimiter: a title that opens with a `YYYY-MM-DD`-shaped word, on a line with fewer dates than its maximum, has that word read as a date. A deliberate, accepted tradeoff rather than an escaping scheme. `add` guards against it: a title starting with a date is refused unless `--due` is given (which fills both date slots, so the title is safe). Dates must be zero-padded — `2024-9-1` is plain title text.
 
 ## Configuration
 
