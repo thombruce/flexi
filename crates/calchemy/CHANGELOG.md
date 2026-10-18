@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- In the file, a same-day end at or before the start time (`20:00 02:00`) now ends the next day, as `add` already did with `20:00-02:00`. Previously it was read as a negative-length event on the same day.
 - Dates and times follow one rule, in the file and on the command line: a 4-digit year with a 1–2 digit month and day (`2030-1-5`), and a 1–2 digit hour with 2-digit minutes (`9:00`). Previously anything chrono accepted counted, including `1-2-3` (the year 1), `24-1-5`, `+2030-01-05` and `9:5`; those are now plain title text. Dates and times are still written padded.
 
 ### Fixed

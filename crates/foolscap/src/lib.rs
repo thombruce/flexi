@@ -1,8 +1,11 @@
 //! Plumbing shared by the flexi family of plaintext tools: XDG path
 //! discovery, toml config loading, line-oriented file I/O with atomic
-//! rewrites, `$EDITOR` launching, and opt-in building blocks for parsing
-//! records (`prefix`, `tags`, `note`, and `dates` behind the `dates` feature). Deliberately minimal — per-tool config
-//! structs, validation, and storage semantics stay in each tool's crate.
+//! rewrites, and `$EDITOR` launching. Plus opt-in building blocks for
+//! parsing records: `prefix`, `tags`, `note`, and `dates` (behind the
+//! `dates` feature).
+//!
+//! Blocks deal in token shapes; each tool owns its line grammar, domain
+//! values, config, and storage semantics.
 
 #[cfg(feature = "dates")]
 pub mod dates;

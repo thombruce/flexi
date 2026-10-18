@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- `--since`/`--until` dates follow the family date rule: the month and day may drop leading zeros (`2026-7-1`), but the year must be 4 digits, so `1-2-3` is rejected rather than read as the year 1.
+
 ## [0.3.0] - 2026-10-18
 
 ### Changed

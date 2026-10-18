@@ -1161,3 +1161,11 @@ fn whitespace_only_tail_line_is_skipped() {
     flexi(&["add", "30", "min"], dir.path()).success();
     flexi(&[], dir.path()).success().stdout("1 hr 30 min\n");
 }
+
+#[test]
+fn since_uses_the_family_date_rule() {
+    let dir = tempdir().unwrap();
+    write_log(dir.path(), "2026-07-11 09:00 +1 hr > 1 hr\n");
+    flexi(&["log", "--since", "1-2-3"], dir.path()).failure();
+    assert_eq!(log_lines(dir.path(), &["--since", "2026-7-1"]).len(), 1);
+}

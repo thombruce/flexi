@@ -1,6 +1,6 @@
 [package]
 name = "foolscap"
-version = "0.1.1"
+version = "0.2.0"
 edition = "2021"
 description = "Shared plumbing (XDG paths, config loading, atomic line I/O) for the flexi family of plaintext CLI tools"
 license = "MIT"

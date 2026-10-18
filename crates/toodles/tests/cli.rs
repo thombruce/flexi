@@ -197,3 +197,14 @@ fn due_accepts_bounded_unpadded_dates() {
     assert_eq!(read_log(dir.path()).trim(), format!("{} 2030-01-05 Renew", today()));
     toodles(&["add", "--due", "30-1-5", "Nope"], dir.path()).failure();
 }
+
+#[test]
+fn moving_between_done_and_wont_restamps_the_closed_date() {
+    let dir = tempdir().unwrap();
+    write_log(dir.path(), "x 2020-01-02 2020-01-01 Learn Esperanto\n");
+    toodles(&["wont", "1"], dir.path()).success();
+    assert_eq!(read_log(dir.path()).trim(), format!("~ {} 2020-01-01 Learn Esperanto", today()));
+    write_log(dir.path(), "~ 2020-01-02 2020-01-01 Learn Esperanto\n");
+    toodles(&["done", "1"], dir.path()).success();
+    assert_eq!(read_log(dir.path()).trim(), format!("x {} 2020-01-01 Learn Esperanto", today()));
+}

@@ -13,7 +13,7 @@ name = "flexi"
 path = "src/main.rs"
 
 [dependencies]
-foolscap = { path = "../foolscap", version = "0.1.1" }
+foolscap = { path = "../foolscap", version = "0.2.0", features = ["dates"] }
 anyhow = "1"
 chrono = "0.4"
 arboard = "3"

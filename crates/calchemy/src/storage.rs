@@ -47,15 +47,20 @@ impl Appt {
             let end = parse_date(ed).ok()?.and_time(parse_time(et).ok()?);
             (end > date.and_time(parse_time(s).ok()?)).then_some(end)
         };
-        let (start, end, consumed) = match rest {
-            [s, ed, et, ..] if later_end(s, ed, et).is_some() => {
-                (Some(parse_time(s)?), later_end(s, ed, et), 3)
+        let timed_later_end = match rest {
+            [s, ed, et, ..] => later_end(s, ed, et),
+            _ => None,
+        };
+        let (start, end, consumed) = match (rest, timed_later_end) {
+            ([s, ..], Some(end)) => (Some(parse_time(s)?), Some(end), 3),
+            ([s, e, ..], _) if parse_time(s).is_ok() && parse_time(e).is_ok() => {
+                // An end at or before the start is the next day, as in `add`.
+                let (s, e) = (parse_time(s)?, parse_time(e)?);
+                let end_date = if e > s { date } else { date + chrono::Duration::days(1) };
+                (Some(s), Some(end_date.and_time(e)), 2)
             }
-            [s, e, ..] if parse_time(s).is_ok() && parse_time(e).is_ok() => {
-                (Some(parse_time(s)?), Some(date.and_time(parse_time(e)?)), 2)
-            }
-            [s, ..] if parse_time(s).is_ok() => (Some(parse_time(s)?), None, 1),
-            [ed, ..] if parse_date(ed).is_ok_and(|end_date| end_date > date) => {
+            ([s, ..], _) if parse_time(s).is_ok() => (Some(parse_time(s)?), None, 1),
+            ([ed, ..], _) if parse_date(ed).is_ok_and(|end_date| end_date > date) => {
                 (None, Some(parse_date(ed)?.and_time(NaiveTime::MIN)), 1)
             }
             _ => (None, None, 0),
@@ -162,6 +167,14 @@ mod tests {
         let a = Appt::parse("2026-07-17 09:00 2026-07-16 10:00 x").unwrap();
         assert_eq!(a.start, foolscap::dates::parse_time("09:00"));
         assert_eq!((a.end, a.title.as_str()), (None, "2026-07-16 10:00 x"));
+    }
+
+    #[test]
+    fn same_day_end_at_or_before_start_rolls_to_next_day() {
+        let a = Appt::parse("2030-01-05 20:00 02:00 Party").unwrap();
+        assert_eq!(a.end, parse_date("2030-01-06").ok().map(|d| d.and_time(parse_time("02:00").unwrap())));
+        assert_eq!(a.last_date(), parse_date("2030-01-06").unwrap());
+        assert_eq!(a.title, "Party");
     }
 
     #[test]

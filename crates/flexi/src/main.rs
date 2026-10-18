@@ -326,20 +326,20 @@ fn run_log(cfg: &config::ResolvedConfig, filter: &LogFilter, summary: bool, pros
         until_date = Some(now);
     } else {
         since_date = filter.since.as_deref()
-            .map(|s| chrono::NaiveDate::parse_from_str(s, "%Y-%m-%d")
+            .map(|s| foolscap::dates::parse_date(s)
                 .context("invalid --since date, expected YYYY-MM-DD"))
             .transpose()?;
         until_date = filter.until.as_deref()
-            .map(|s| chrono::NaiveDate::parse_from_str(s, "%Y-%m-%d")
+            .map(|s| foolscap::dates::parse_date(s)
                 .context("invalid --until date, expected YYYY-MM-DD"))
             .transpose()?;
     }
 
     let mut filtered: Vec<_> = entries.into_iter().filter(|e| {
         let date_str = e.timestamp.get(..10).unwrap_or("");
-        match chrono::NaiveDate::parse_from_str(date_str, "%Y-%m-%d") {
-            Err(_) => true,
-            Ok(d) => {
+        match foolscap::dates::parse_date(date_str) {
+            None => true,
+            Some(d) => {
                 since_date.is_none_or(|s| d >= s)
                     && until_date.is_none_or(|u| d <= u)
             }

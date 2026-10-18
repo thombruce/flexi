@@ -5,9 +5,9 @@ use anyhow::{Context, Result};
 use chrono::{Local, NaiveDate};
 use clap::{Args, CommandFactory, Parser, Subcommand};
 use clap_complete::{generate, Shell};
+use foolscap::prefix::Status;
 use foolscap::tags;
 use owo_colors::{OwoColorize, Stream::Stdout};
-use foolscap::prefix::Status;
 use storage::Todo;
 
 #[derive(Parser)]
@@ -105,6 +105,9 @@ fn find_todo(cfg: &config::ResolvedConfig, index: usize) -> Result<Todo> {
 
 /// Toggles the todo at `index` towards `to` (or back to open), stamping the
 /// closed date when it becomes done or obsolete and clearing it otherwise.
+/// Moving between done and obsolete re-stamps it on purpose: the closed date
+/// records when the todo got its current status ("I thought I wouldn't, but
+/// I did, today"), not when it first closed.
 fn toggle_status(cfg: &config::ResolvedConfig, index: usize, to: Status, today: NaiveDate) -> Result<()> {
     let mut todo = find_todo(cfg, index)?;
     let old_raw = todo.raw.clone();
