@@ -45,6 +45,16 @@ enum Commands {
         /// The item's index as shown by `bagg list`
         index: usize,
     },
+    /// Toggle "buying this trip" (`!`) for the item at this position in `list`
+    Focus {
+        /// The item's index as shown by `bagg list`
+        index: usize,
+    },
+    /// Toggle "won't buy" (`~`, kept for the record) for the item at this position in `list`
+    Wont {
+        /// The item's index as shown by `bagg list`
+        index: usize,
+    },
     /// Remove an item by its number in `list`
     #[command(alias = "remove")]
     Rm {
@@ -63,12 +73,15 @@ enum Commands {
 
 #[derive(Args)]
 struct ItemFilter {
-    /// Only not-got items
-    #[arg(long, conflicts_with = "got")]
+    /// Only not-got items (including `!` this trip)
+    #[arg(long, conflicts_with_all = ["got", "wont"])]
     pending: bool,
     /// Only got items
-    #[arg(long, conflicts_with = "pending")]
+    #[arg(long, conflicts_with_all = ["pending", "wont"])]
     got: bool,
+    /// Only won't-buy items
+    #[arg(long, conflicts_with_all = ["pending", "got"])]
+    wont: bool,
 }
 
 /// All items, sorted by status/priority/price. Indices used by `got`/`rm`
@@ -88,6 +101,23 @@ fn find_item(cfg: &config::ResolvedConfig, fmt: PriceFormat, index: usize) -> Re
         .with_context(|| format!("no item {} — run `bagg list`", index))
 }
 
+/// Toggles the item at `index` towards `to`, or back to wanted.
+fn toggle_status(cfg: &config::ResolvedConfig, fmt: PriceFormat, index: usize, to: Status) -> Result<()> {
+    let mut item = find_item(cfg, fmt, index)?;
+    let old_raw = item.raw.clone();
+    item.status = item.status.toggled(to);
+    let new_line = item.to_line(fmt, cfg.always_show_unspecified_price);
+    storage::replace_line(&cfg.path, &old_raw, &new_line)?;
+    let label = match item.status {
+        Status::Focus => "this trip",
+        Status::Open => "want",
+        Status::Done => "got",
+        Status::Obsolete => "won't buy",
+    };
+    println!("{}: {}", label, new_line);
+    Ok(())
+}
+
 fn run_list(cfg: &config::ResolvedConfig, fmt: PriceFormat, filter: &ItemFilter, tag_queries: &[String]) -> Result<()> {
     let items = all_sorted(cfg, fmt)?;
     if items.is_empty() {
@@ -100,6 +130,9 @@ fn run_list(cfg: &config::ResolvedConfig, fmt: PriceFormat, filter: &ItemFilter,
             continue;
         }
         if filter.got && item.status != Status::Done {
+            continue;
+        }
+        if filter.wont && item.status != Status::Obsolete {
             continue;
         }
         if !tags::matches(&item.name, tag_queries) {
@@ -131,7 +164,7 @@ fn main() -> Result<()> {
     let fmt = PriceFormat { separator: cfg.decimal_separator, places: cfg.decimal_places };
 
     match cli.command {
-        None => run_list(&cfg, fmt, &ItemFilter { pending: false, got: false }, &[])?,
+        None => run_list(&cfg, fmt, &ItemFilter { pending: false, got: false, wont: false }, &[])?,
         Some(Commands::List { filter, tags }) => run_list(&cfg, fmt, &filter, &tags)?,
         Some(Commands::Add { price, qty, priority, name }) => {
             let name = name.join(" ");
@@ -148,14 +181,9 @@ fn main() -> Result<()> {
             storage::append_line(&cfg.path, &line)?;
             println!("added: {}", line);
         }
-        Some(Commands::Got { index }) => {
-            let mut item = find_item(&cfg, fmt, index)?;
-            let old_raw = item.raw.clone();
-            item.status = if item.status == Status::Done { Status::Open } else { Status::Done };
-            let new_line = item.to_line(fmt, cfg.always_show_unspecified_price);
-            storage::replace_line(&cfg.path, &old_raw, &new_line)?;
-            println!("{}: {}", if item.status == Status::Done { "got" } else { "want" }, new_line);
-        }
+        Some(Commands::Got { index }) => toggle_status(&cfg, fmt, index, Status::Done)?,
+        Some(Commands::Focus { index }) => toggle_status(&cfg, fmt, index, Status::Focus)?,
+        Some(Commands::Wont { index }) => toggle_status(&cfg, fmt, index, Status::Obsolete)?,
         Some(Commands::Rm { index }) => {
             let item = find_item(&cfg, fmt, index)?;
             storage::remove_line(&cfg.path, &item.raw)?;

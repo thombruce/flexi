@@ -30,7 +30,7 @@ Planned blocks, each tracked as a sub-issue of #53:
 
 - **Tags** (#54, **done**): `foolscap::tags`, `+project`/`@context`/`key:value` in free text, used by bagg, calchemy, holler, toodles.
 - **`#hashtag`** (#55, **done**): a tag kind in `foolscap::tags`; `#` followed by a letter.
-- **Prefix markers** (#56, **done**): `foolscap::prefix`, an optional status token then an optional `(A)` priority, used by bagg and toodles. `Status` is `Focus` (`!`), `Open` (no marker), `Done` (`x`), `Obsolete` (`~`), declared in sort order; one status per line, bare tokens only. Decisions are recorded on #41.
+- **Prefix markers** (#56, **done**): `foolscap::prefix`, an optional status token then an optional `(A)` priority, used by bagg and toodles. `Status` is `Focus` (`!`), `Open` (no marker), `Done` (`x`), `Obsolete` (`~`), declared in sort order; one status per line, bare tokens only. Decisions are recorded on #41. `Status::toggled(to)` is the shared toggle rule: `done`/`got`, `focus` and `wont` each set their status, or reopen if it's already set. Both tools have one `toggle_status` handler, and add a `--wont` filter.
 - **Dates** (#57): strict `YYYY-MM-DD`, behind a `dates` cargo feature; the family rule is decided in #52.
 - **Note** (#58, **done**): `foolscap::note`, the ` # note` suffix (`split`/`append`/`parse`), used by flexi and clocking. It's opt-in and separate from the description/tags block.
 

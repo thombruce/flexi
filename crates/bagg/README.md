@@ -44,8 +44,11 @@ bagg add --priority A --price 12.99 --qty 2 "Widget thing"
 bagg list                              # everything, sorted (alias for bare invocation)
 bagg list --pending                    # only not-got items
 bagg list --got                        # only got items
+bagg list --wont                       # only won't-buy items
 bagg list +kitchen-reno                # only items tagged +kitchen-reno
 bagg got 2                             # toggle got/not-got for item #2 as shown by `list`
+bagg focus 2                           # toggle "buying this trip" (`!`)
+bagg wont 2                            # toggle "won't buy" (`~`, kept for the record)
 bagg rm 2                              # remove item #2 as shown by `list`
 bagg edit                              # open the list file in $EDITOR
 bagg completions <shell>                # print a shell completion script

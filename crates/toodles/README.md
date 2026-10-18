@@ -43,8 +43,11 @@ toodles add --priority A --due 2026-10-31 Renew passport
 toodles list                              # everything, sorted (alias for bare invocation)
 toodles list --open                       # only open todos
 toodles list --done                       # only done todos
+toodles list --wont                       # only won't-do (obsolete) todos
 toodles list +house @phone                # only todos tagged +house or @phone
 toodles done 2                            # toggle done/open for todo #2 as shown by `list`
+toodles focus 2                           # toggle focus (`!`, working on it now)
+toodles wont 2                            # toggle won't-do (`~`, kept for the record)
 toodles rm 2                              # remove todo #2 as shown by `list`
 toodles edit                              # open the todo file in $EDITOR
 toodles completions <shell>               # print a shell completion script
