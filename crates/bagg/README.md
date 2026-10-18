@@ -56,7 +56,7 @@ bagg man                               # print the man page (roff) to stdout
 
 Items are always listed sorted, regardless of their order in the file: not-got before got, then priority `A` before `B` before none, then cheapest price before priciest before unpriced. `list --pending`/`--got` filter that same sorted listing without renumbering it — an item keeps the index it has in the full list even when a filter hides its neighbors, so `got`/`rm` always target what you expect.
 
-`list` also takes `+project`, `@context`, or `key:value` tag queries (e.g. `bagg list +kitchen-reno @tesco`), matched case-insensitively against tags embedded anywhere in an item's name — multiple queries match if the item carries any of them. Tags aren't a separate stored field; they're plain words in `NAME` (`Screws +kitchen-reno`), parsed on the fly when filtering, todo.txt's own convention. This is also the answer to "how do I group related items" (e.g. several parts for one project) — tag them all with the same `+project`, no nesting needed.
+`list` also takes `+project`, `@context`, `#hashtag`, or `key:value` tag queries (e.g. `bagg list +kitchen-reno @tesco '#gift'`), matched case-insensitively against tags embedded anywhere in an item's name — multiple queries match if the item carries any of them. Tags aren't a separate stored field; they're plain words in `NAME` (`Screws +kitchen-reno`), parsed on the fly when filtering, todo.txt's own convention. This is also the answer to "how do I group related items" (e.g. several parts for one project) — tag them all with the same `+project`, no nesting needed. A `#hashtag` must start with a letter (`#42` isn't one), and must be quoted on the command line (`'#urgent'`), or the shell treats it as a comment.
 
 ## Storage format
 

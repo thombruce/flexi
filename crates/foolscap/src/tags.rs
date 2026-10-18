@@ -1,11 +1,16 @@
-//! Todo.txt-style tags in free text: `+project`, `@context`, `key:value`.
+//! Todo.txt-style tags in free text: `+project`, `@context`, `key:value`,
+//! and `#hashtag`.
 
-/// Extracts a `+project`, `@context`, or `key:value` tag from a single
-/// whitespace token, if it's shaped like one. The key of a `key:value` pair
-/// must start with a letter — this excludes a bare numeric token (e.g. a
-/// clock time `10:00`) from being misread as a tag.
+/// Extracts a `+project`, `@context`, `#hashtag`, or `key:value` tag from a
+/// single whitespace token, if it's shaped like one. A `#hashtag` and the key
+/// of a `key:value` pair must start with a letter: this keeps a clock time
+/// (`10:00`) or a number (`#42`) from being misread as a tag, and a bare `#`
+/// is never a tag, since it starts a ` # note` in tools that use notes.
 fn extract_tag(token: &str) -> Option<String> {
     if token.len() > 1 && (token.starts_with('+') || token.starts_with('@')) {
+        return Some(token.to_lowercase());
+    }
+    if token.strip_prefix('#').and_then(|rest| rest.chars().next()).is_some_and(|c| c.is_ascii_alphabetic()) {
         return Some(token.to_lowercase());
     }
     if let Some((key, value)) = token.split_once(':') {
@@ -17,7 +22,7 @@ fn extract_tag(token: &str) -> Option<String> {
 }
 
 /// True if `text` carries any of `queries` as a `+project`/`@context`/
-/// `key:value` tag (case-insensitive, matches if ANY query is present). An
+/// `#hashtag`/`key:value` tag (case-insensitive, matches if ANY query is present). An
 /// empty `queries` matches everything (no filter).
 pub fn matches(text: &str, queries: &[String]) -> bool {
     if queries.is_empty() {
@@ -60,6 +65,18 @@ mod tests {
     #[test]
     fn numeric_key_is_not_a_tag() {
         assert!(!matches("Meeting at 10:00", &["10:00".to_string()]));
+    }
+
+    #[test]
+    fn hashtag_matches() {
+        assert!(matches("Fix the gutter #Urgent", &["#urgent".to_string()]));
+    }
+
+    #[test]
+    fn hashtag_needs_a_letter_and_bare_hash_is_not_a_tag() {
+        assert!(!matches("See issue #42", &["#42".to_string()]));
+        assert!(!matches("+1 hr > 2 hr # stayed late", &["#".to_string()]));
+        assert!(!matches("Learn C# basics", &["c#".to_string()]));
     }
 
     #[test]

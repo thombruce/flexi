@@ -54,7 +54,7 @@ holler man                              # print the man page (roff) to stdout
 
 `phone`/`email` match case-insensitively against a substring of the contact's name. A single match prints the bare value(s) — one per line if there's more than one — so it's pipe-friendly (`holler email John | xargs open`, say). Multiple matches print `Name: value` per line so you can tell them apart; a contact with nothing on file for that field shows as `Name: (no phone)` in a multi-match list, or a plain message if it's the only match. No match at all is an error.
 
-Contacts are always listed alphabetically by name, regardless of file order — the only universal field, unlike the other tools' domain-specific sort keys (chronological, status/priority/price). `list` also takes `+project`/`@context`/`key:value` tag queries the same way bagg/calchemy's `list` does, matched against whatever's embedded in the name.
+Contacts are always listed alphabetically by name, regardless of file order — the only universal field, unlike the other tools' domain-specific sort keys (chronological, status/priority/price). `list` also takes `+project`/`@context`/`#hashtag`/`key:value` tag queries the same way bagg/calchemy's `list` does, matched against whatever's embedded in the name. A `#hashtag` must start with a letter (`#42` isn't one), and must be quoted on the command line (`'#urgent'`), or the shell treats it as a comment.
 
 ## Storage format
 

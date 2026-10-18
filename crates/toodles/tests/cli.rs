@@ -152,3 +152,13 @@ fn edit_works_before_the_first_add() {
         .success();
     assert_eq!(read_log(dir.path()).trim(), "Fresh");
 }
+
+#[test]
+fn list_filters_by_hashtag() {
+    let dir = tempdir().unwrap();
+    write_log(dir.path(), "Fix gutter #urgent\nSee issue #42\n");
+    let listing = out(toodles(&["list", "#urgent"], dir.path()));
+    assert!(listing.contains("Fix gutter #urgent"), "{listing}");
+    assert!(!listing.contains("issue"), "{listing}");
+    assert!(out(toodles(&["list", "#42"], dir.path())).trim().is_empty());
+}
