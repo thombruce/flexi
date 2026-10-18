@@ -1,6 +1,6 @@
 [package]
 name = "toodles"
-version = "0.1.0"
+version = "0.2.0"
 edition = "2021"
 description = "A minimal plaintext todo list for the command line, with due dates"
 license = "MIT"

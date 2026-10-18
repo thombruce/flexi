@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.7.0] - 2026-10-18
+
+### Added
+
+- `list` tag queries now also match `#hashtag` tags (a `#` followed by a word starting with a letter, e.g. `#urgent`; `#42` isn't one). Quote it on the command line (`list '#urgent'`), or the shell treats it as a comment.
+
 ### Changed
 
 - In the file, a same-day end at or before the start time (`20:00 02:00`) now ends the next day, as `add` already did with `20:00-02:00`. Previously it was read as a negative-length event on the same day.
@@ -15,10 +21,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 
 - A title starting with a date-like word (e.g. `2030-01-05 1-2-3 go`) no longer fails the whole file with "end date not after start". In the file, an end that isn't after the start is now left as title text.
-
-### Added
-
-- `list` tag queries now also match `#hashtag` tags (a `#` followed by a word starting with a letter, e.g. `#urgent`; `#42` isn't one). Quote it on the command line (`list '#urgent'`), or the shell treats it as a comment.
 
 ## [0.6.0] - 2026-10-18
 
