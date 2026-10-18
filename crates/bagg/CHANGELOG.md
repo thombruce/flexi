@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Lines may start with `!` (buying this trip) or `~` (decided not to buy) as well as `x`, at most one per line. Items sort `!`, wanted, got, then `~`. `--pending` includes `!` items. Commands to set them come separately (#41); for now, add the marker with `bagg edit`.
 - `list` tag queries now also match `#hashtag` tags (a `#` followed by a word starting with a letter, e.g. `#urgent`; `#42` isn't one). Quote it on the command line (`list '#urgent'`), or the shell treats it as a comment.
 
 ## [0.4.0] - 2026-10-18

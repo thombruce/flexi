@@ -7,6 +7,7 @@ use clap::{Args, CommandFactory, Parser, Subcommand};
 use clap_complete::{generate, Shell};
 use foolscap::tags;
 use owo_colors::{OwoColorize, Stream::Stdout};
+use foolscap::prefix::Status;
 use storage::Todo;
 
 #[derive(Parser)]
@@ -21,7 +22,7 @@ enum Commands {
     /// Add a todo: `add [--priority A-Z] [--due YYYY-MM-DD] <title...>`
     Add {
         /// Priority, a single letter A-Z
-        #[arg(long, short = 'p', value_parser = parse_priority_arg)]
+        #[arg(long, short = 'p', value_parser = foolscap::prefix::parse_priority_arg)]
         priority: Option<char>,
         /// Due date, YYYY-MM-DD
         #[arg(long, short = 'd', value_parser = parse_date_arg)]
@@ -68,14 +69,6 @@ struct TodoFilter {
     done: bool,
 }
 
-fn parse_priority_arg(s: &str) -> Result<char, String> {
-    let mut chars = s.chars();
-    match (chars.next(), chars.next()) {
-        (Some(c), None) if c.is_ascii_uppercase() => Ok(c),
-        _ => Err(format!("invalid priority {:?}, expected a single letter A-Z", s)),
-    }
-}
-
 fn parse_date_arg(s: &str) -> Result<NaiveDate, String> {
     storage::parse_date(s).ok_or_else(|| format!("invalid date {:?}, expected YYYY-MM-DD", s))
 }
@@ -106,10 +99,10 @@ fn run_list(cfg: &config::ResolvedConfig, filter: &TodoFilter, tag_queries: &[St
     let today = Local::now().date_naive();
     let width = todos.len().to_string().len();
     for (i, todo) in todos.iter().enumerate() {
-        if filter.open && todo.done {
+        if filter.open && todo.status.is_closed() {
             continue;
         }
-        if filter.done && !todo.done {
+        if filter.done && todo.status != Status::Done {
             continue;
         }
         if !tags::matches(&todo.title, tag_queries) {
@@ -117,7 +110,7 @@ fn run_list(cfg: &config::ResolvedConfig, filter: &TodoFilter, tag_queries: &[St
         }
         let n = format!("{:>width$}", i + 1, width = width);
         let line = todo.to_line();
-        let line = if todo.done {
+        let line = if todo.status.is_closed() {
             line.if_supports_color(Stdout, |t| t.dimmed()).to_string()
         } else if todo.due.is_some_and(|d| d < today) {
             line.if_supports_color(Stdout, |t| t.red()).to_string()
@@ -159,7 +152,7 @@ fn main() -> Result<()> {
                 "title starts with a date, which would be read as the due date — pass --due, or add it with `toodles edit`"
             );
             // Created is always stamped: a due date is only expressible after one.
-            let todo = Todo { done: false, priority, closed: None, created: Some(today), due, title, raw: String::new() };
+            let todo = Todo { status: Status::Open, priority, closed: None, created: Some(today), due, title, raw: String::new() };
             let line = todo.to_line();
             storage::append_line(&cfg.path, &line)?;
             println!("added: {}", line);
@@ -167,11 +160,11 @@ fn main() -> Result<()> {
         Some(Commands::Done { index }) => {
             let mut todo = find_todo(&cfg, index)?;
             let old_raw = todo.raw.clone();
-            todo.done = !todo.done;
-            todo.closed = todo.done.then_some(today);
+            todo.status = if todo.status == Status::Done { Status::Open } else { Status::Done };
+            todo.closed = todo.status.is_closed().then_some(today);
             let new_line = todo.to_line();
             storage::replace_line(&cfg.path, &old_raw, &new_line)?;
-            println!("{}: {}", if todo.done { "done" } else { "reopened" }, new_line);
+            println!("{}: {}", if todo.status == Status::Done { "done" } else { "reopened" }, new_line);
         }
         Some(Commands::Rm { index }) => {
             let todo = find_todo(&cfg, index)?;

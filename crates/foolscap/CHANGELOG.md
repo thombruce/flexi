@@ -11,6 +11,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - `tags` module: `tags::matches(text, queries)` finds todo.txt-style `+project`/`@context`/`key:value` tags, plus `#hashtag` (`#` then a letter; a bare `#` is never a tag, so it can't clash with ` # note`), in free text (case-insensitive, matching if any query is present). It was previously copied into bagg, calchemy, holler and toodles. This is the first building block beyond plumbing (#53).
 - `note` module: `note::split`, `note::append` and `note::parse` for an opt-in `<body> # <note>` suffix, starting at the first bare `#`. It was previously separate code in flexi and clocking.
+- `prefix` module: `Prefix::take`/`Prefix::tokens` for the todo.txt-style line prefix, an optional status (`Status`: `!` focus, open, `x` done, `~` obsolete, declared in sort order, with `is_closed`) then an optional `(A)` priority, plus `parse_priority`/`parse_priority_arg`. Replaces the separate copies in bagg and toodles.
 
 ## [0.1.0] - 2026-10-18
 

@@ -1,17 +1,20 @@
 use anyhow::Result;
 use chrono::NaiveDate;
+use foolscap::prefix::{Prefix, Status};
 use std::path::Path;
 
 use foolscap::read_lines;
 pub use foolscap::{append_line, remove_line, replace_line};
 
-/// One todo, parsed from a line `[x ][(A) ][CLOSED ][CREATED ][DUE ]TITLE`.
+/// One todo, parsed from a line `[STATUS ][(A) ][CLOSED ][CREATED ][DUE ]TITLE`.
 ///
-/// todo.txt's two dates plus a third, positional due date:
+/// `STATUS` is `!` focus, `x` done or `~` obsolete (`foolscap::prefix`); none
+/// means open. todo.txt's two dates plus a third, positional due date:
 ///
-/// - Open: `[CREATED [DUE]]` — one leading date is created, two are created + due.
-/// - Closed: `x [CLOSED [CREATED [DUE]]]` — todo.txt's `x CLOSED CREATED`,
-///   with due appended as the third date.
+/// - Open or focused: `[CREATED [DUE]]` — one leading date is created, two
+///   are created + due.
+/// - Closed (`x` or `~`): `[CLOSED [CREATED [DUE]]]` — todo.txt's
+///   `x CLOSED CREATED`, with due appended as the third date.
 ///
 /// The date count is what tells the dates apart, so a due date requires a
 /// created date (`add` always stamps one). Priority is kept on completion
@@ -22,7 +25,7 @@ pub use foolscap::{append_line, remove_line, replace_line};
 /// word claimed as a date.
 #[derive(Debug, Clone, PartialEq)]
 pub struct Todo {
-    pub done: bool,
+    pub status: Status,
     pub priority: Option<char>,
     pub closed: Option<NaiveDate>,
     pub created: Option<NaiveDate>,
@@ -37,19 +40,9 @@ impl Todo {
         let mut tokens: Vec<&str> = line.split_whitespace().collect();
         anyhow::ensure!(!tokens.is_empty(), "empty line");
 
-        let done = if tokens.first() == Some(&"x") {
-            tokens.remove(0);
-            true
-        } else {
-            false
-        };
+        let Prefix { status, priority } = Prefix::take(&mut tokens);
 
-        let priority = tokens.first().and_then(|t| parse_priority(t));
-        if priority.is_some() {
-            tokens.remove(0);
-        }
-
-        let max_dates = if done { 3 } else { 2 };
+        let max_dates = if status.is_closed() { 3 } else { 2 };
         let mut dates = Vec::new();
         while dates.len() < max_dates {
             match tokens.first().and_then(|t| parse_date(t)) {
@@ -61,47 +54,32 @@ impl Todo {
             }
         }
         let mut dates = dates.into_iter();
-        let closed = if done { dates.next() } else { None };
+        let closed = if status.is_closed() { dates.next() } else { None };
         let created = dates.next();
         let due = dates.next();
 
         anyhow::ensure!(!tokens.is_empty(), "missing title in line: {:?}", line);
         let title = tokens.join(" ");
 
-        Ok(Todo { done, priority, closed, created, due, title, raw: line.to_string() })
+        Ok(Todo { status, priority, closed, created, due, title, raw: line.to_string() })
     }
 
-    /// Sort key: open before closed, then priority A..Z (none last), then
-    /// due soonest-first (none last), stable on file order for ties.
-    pub fn sort_key(&self) -> (bool, u8, NaiveDate) {
+    /// Sort key: focused, open, done, then obsolete; then priority A..Z (none
+    /// last), then due soonest-first (none last), stable on file order for ties.
+    pub fn sort_key(&self) -> (Status, u8, NaiveDate) {
         let priority = self.priority.map(|p| p as u8).unwrap_or(u8::MAX);
-        (self.done, priority, self.due.unwrap_or(NaiveDate::MAX))
+        (self.status, priority, self.due.unwrap_or(NaiveDate::MAX))
     }
 
     /// Renders the canonical storage line. Dates are written in order and
     /// stop at the first absent one — a later date can't be written without
     /// the earlier ones, since position is what identifies it.
     pub fn to_line(&self) -> String {
-        let mut parts = Vec::new();
-        if self.done {
-            parts.push("x".to_string());
-        }
-        if let Some(p) = self.priority {
-            parts.push(format!("({})", p));
-        }
-        let dates = if self.done { vec![self.closed, self.created, self.due] } else { vec![self.created, self.due] };
+        let mut parts = Prefix { status: self.status, priority: self.priority }.tokens();
+        let dates = if self.status.is_closed() { vec![self.closed, self.created, self.due] } else { vec![self.created, self.due] };
         parts.extend(dates.into_iter().map_while(|d| d.map(|d| d.format("%Y-%m-%d").to_string())));
         parts.push(self.title.clone());
         parts.join(" ")
-    }
-}
-
-fn parse_priority(s: &str) -> Option<char> {
-    let bytes = s.as_bytes();
-    if bytes.len() == 3 && bytes[0] == b'(' && bytes[2] == b')' && bytes[1].is_ascii_uppercase() {
-        Some(bytes[1] as char)
-    } else {
-        None
     }
 }
 
@@ -133,7 +111,7 @@ mod tests {
     #[test]
     fn parse_bare_title() {
         let t = todo("Call mum");
-        assert!(!t.done);
+        assert_eq!(t.status, Status::Open);
         assert_eq!((t.priority, t.closed, t.created, t.due), (None, None, None, None));
         assert_eq!(t.title, "Call mum");
     }
@@ -155,10 +133,22 @@ mod tests {
         let t = todo("x 2024-09-20 2024-09-01 Closed and created");
         assert_eq!((t.closed, t.created, t.due), (d("2024-09-20"), d("2024-09-01"), None));
         let t = todo("x (B) 2024-09-20 2024-09-01 2024-09-30 All three");
-        assert!(t.done);
+        assert_eq!(t.status, Status::Done);
         assert_eq!(t.priority, Some('B'));
         assert_eq!((t.closed, t.created, t.due), (d("2024-09-20"), d("2024-09-01"), d("2024-09-30")));
         assert_eq!(t.title, "All three");
+    }
+
+    #[test]
+    fn focus_takes_open_dates_and_obsolete_takes_closed_dates() {
+        let t = todo("! 2024-09-01 2024-09-30 2024-10-01 launch");
+        assert_eq!(t.status, Status::Focus);
+        assert_eq!((t.closed, t.created, t.due), (None, d("2024-09-01"), d("2024-09-30")));
+        assert_eq!(t.title, "2024-10-01 launch");
+        let t = todo("~ (C) 2024-09-20 2024-09-01 2024-09-30 Never");
+        assert_eq!(t.status, Status::Obsolete);
+        assert_eq!(t.priority, Some('C'));
+        assert_eq!((t.closed, t.created, t.due), (d("2024-09-20"), d("2024-09-01"), d("2024-09-30")));
     }
 
     #[test]
@@ -190,6 +180,8 @@ mod tests {
             "x Closed bare",
             "x 2024-09-20 2024-09-01 Closed and created",
             "x (B) 2024-09-20 2024-09-01 2024-09-30 All three",
+            "! (A) 2024-09-01 2024-09-30 Focused",
+            "~ 2024-09-20 2024-09-01 Won't do",
         ] {
             assert_eq!(todo(l).to_line(), l);
         }
@@ -197,7 +189,9 @@ mod tests {
 
     #[test]
     fn sort_key_orders_status_then_priority_then_due() {
+        assert!(todo("! Focused").sort_key() < todo("(A) Open").sort_key());
         assert!(todo("Open").sort_key() < todo("x Closed").sort_key());
+        assert!(todo("x Closed").sort_key() < todo("~ Obsolete").sort_key());
         assert!(todo("(A) a").sort_key() < todo("(B) b").sort_key());
         assert!(todo("(B) b").sort_key() < todo("c").sort_key());
         let soon = todo("2024-09-01 2024-09-10 soon");

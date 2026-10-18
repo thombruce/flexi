@@ -53,7 +53,7 @@ toodles man                               # print the man page (roff) to stdout
 
 `$EDITOR` is run through `sh`, as git does (so `edit` isn't supported on Windows), and may carry arguments (`EDITOR="code -w"`). An editor path containing spaces must be quoted inside it: `EDITOR='"/Applications/Sublime Text.app/Contents/SharedSupport/bin/subl" -w'`.
 
-Todos are always listed sorted, regardless of their order in the file: open before done, then priority `A` before `B` before none, then soonest due date before later before undated. Open todos past their due date are shown in red. `--open`/`--done` and tag queries filter that same sorted listing without renumbering it, so `done`/`rm` always target what you expect.
+Todos are always listed sorted, regardless of their order in the file: focused, then open, then done, then obsolete; then priority `A` before `B` before none, then soonest due date before later before undated. Open todos past their due date are shown in red. `--open`/`--done` and tag queries filter that same sorted listing without renumbering it, so `done`/`rm` always target what you expect.
 
 Tags (`+project`, `@context`, `#hashtag`, `key:value`) are plain words in the title, todo.txt's own convention, matched case-insensitively — multiple queries match if a todo carries any of them. A shared `+project` tag is how related todos are grouped; there's no nesting. A `#hashtag` must start with a letter (`#42` isn't one), and must be quoted on the command line (`'#urgent'`), or the shell treats it as a comment.
 
@@ -64,13 +64,16 @@ Tags (`+project`, `@context`, `#hashtag`, `key:value`) are plain words in the ti
 2026-10-18 Call mum +family
 x (B) 2026-10-20 2026-10-01 2026-10-15 File taxes
 x 2026-10-19 2026-10-18 Water plants
+! 2026-10-18 Write report
+~ 2026-10-17 2026-10-01 Learn Esperanto
 ```
 
-Each line is `[x ][(A) ][CLOSED ][CREATED ][DUE ]TITLE`:
+Each line is `[STATUS ][(A) ][CLOSED ][CREATED ][DUE ]TITLE`:
 
-- A leading `x` marks the todo done; `(A)`–`(Z)` is an optional priority, kept on completion (unlike todo.txt, which drops it).
-- Open todos carry up to two dates: one is the created date, two are created then **due**.
-- Done todos carry up to three: closed, created, then due — todo.txt's `x CLOSED CREATED`, with due appended.
+- `STATUS` is an optional leading marker, at most one: `!` focus (working on it now), `x` done, or `~` obsolete (won't do, kept for the record rather than removed). No marker means open. Each must be a word on its own, so `!Call` is title text.
+- `(A)`–`(Z)` is an optional priority, kept on completion (unlike todo.txt, which drops it).
+- Open and focused todos carry up to two dates: one is the created date, two are created then **due**.
+- Closed todos (done `x` or obsolete `~`) carry up to three: closed, created, then due — todo.txt's `x CLOSED CREATED`, with due appended.
 
 The number of dates is what identifies each one, so a due date needs a created date in front of it. `add` always stamps one, and `done` stamps (or, when reopening, clears) the closed date. Other todo.txt tools see the due date as part of the description, so the file stays readable by them.
 
