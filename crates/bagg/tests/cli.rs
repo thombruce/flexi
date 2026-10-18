@@ -207,3 +207,23 @@ fn focus_and_wont_toggle_and_filter() {
     bagg(&["got", "1"], dir.path()).success();
     assert!(read_log(dir.path()).contains("x Eggs"));
 }
+
+#[test]
+fn config_path_overrides_the_data_file() {
+    let dir = tempdir().unwrap();
+    let custom = dir.path().join("elsewhere").join("custom.txt");
+    write_config(dir.path(), &format!("path = '{}'\n", custom.display()));
+    bagg(&["add", "Eggs"], dir.path()).success();
+    assert!(fs::read_to_string(&custom).unwrap().contains("Eggs"));
+    assert!(!dir.path().join("bagg").join("bagg.txt").exists());
+}
+
+#[test]
+fn bare_invocation_lists_sorted_or_says_empty() {
+    let dir = tempdir().unwrap();
+    assert_eq!(out(bagg(&[], dir.path())).trim(), "list is empty");
+    write_log(dir.path(), "Second\n(A) First\n");
+    let listing = out(bagg(&[], dir.path()));
+    assert_eq!(listing, out(bagg(&["list"], dir.path())));
+    assert!(listing.find("First").unwrap() < listing.find("Second").unwrap(), "{listing}");
+}

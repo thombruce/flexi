@@ -18,6 +18,11 @@ fn write_log(dir: &Path, content: &str) {
     fs::write(dir.join("clocking").join("clocking.txt"), content).unwrap();
 }
 
+fn write_config(dir: &Path, content: &str) {
+    fs::create_dir_all(dir.join("clocking")).unwrap();
+    fs::write(dir.join("clocking").join("clocking.toml"), content).unwrap();
+}
+
 fn read_log(dir: &Path) -> String {
     fs::read_to_string(dir.join("clocking").join("clocking.txt")).unwrap()
 }
@@ -138,8 +143,7 @@ fn out_preserves_in_and_out_notes() {
 #[test]
 fn out_over_max_session_needs_force() {
     let dir = tempdir().unwrap();
-    fs::create_dir_all(dir.path().join("clocking")).unwrap();
-    fs::write(dir.path().join("clocking").join("clocking.toml"), "max_session = 60\n").unwrap();
+    write_config(dir.path(), "max_session = 60\n");
     write_log(dir.path(), &open_marker_ago(120));
     clocking(&["out"], dir.path())
         .failure()
@@ -177,8 +181,7 @@ fn log_today_filters_by_date() {
 #[test]
 fn full_timestamp_format_records_and_reads() {
     let dir = tempdir().unwrap();
-    fs::create_dir_all(dir.path().join("clocking")).unwrap();
-    fs::write(dir.path().join("clocking").join("clocking.toml"), "timestamp_format = \"full\"\n").unwrap();
+    write_config(dir.path(), "timestamp_format = \"full\"\n");
     // Seed an open marker with a full (25-char, T-separated) timestamp.
     write_log(dir.path(), &open_marker_ago_full(90));
     // Status must parse the full timestamp back.
@@ -252,4 +255,91 @@ fn since_uses_the_family_date_rule() {
     let dir = tempdir().unwrap();
     clocking(&["log", "--since", "1-2-3"], dir.path()).failure();
     clocking(&["log", "--since", "2026-7-1"], dir.path()).success();
+}
+
+#[test]
+fn config_path_overrides_the_data_file() {
+    let dir = tempdir().unwrap();
+    let custom = dir.path().join("elsewhere").join("custom.txt");
+    write_config(dir.path(), &format!("path = '{}'\n", custom.display()));
+    clocking(&["in"], dir.path()).success();
+    assert!(fs::read_to_string(&custom).unwrap().contains("@in"));
+    assert!(!dir.path().join("clocking").join("clocking.txt").exists());
+}
+
+fn day(offset: i64) -> chrono::NaiveDate {
+    Local::now().date_naive() + Duration::days(offset)
+}
+
+fn session_on(date: chrono::NaiveDate, dur: &str) -> String {
+    format!("{} 09:00 10:00 = {}\n", date.format("%Y-%m-%d"), dur)
+}
+
+/// The most recent `weekday` on or before `date`, found by stepping back a
+/// day at a time (deliberately not the code's `num_days_from_*` formula).
+fn last(weekday: chrono::Weekday, mut date: chrono::NaiveDate) -> chrono::NaiveDate {
+    use chrono::Datelike;
+    while date.weekday() != weekday {
+        date = date.pred_opt().unwrap();
+    }
+    date
+}
+
+#[test]
+fn log_date_filters() {
+    let dir = tempdir().unwrap();
+    let today = day(0);
+    let old = chrono::NaiveDate::from_ymd_opt(2020, 1, 1).unwrap();
+    write_log(dir.path(), &format!("{}{}{}", session_on(old, "3 hr"), session_on(day(-1), "2 hr"), session_on(today, "1 hr")));
+    let outputs: Vec<(&str, String)> = ["--today", "--yesterday", "--week", "--month"]
+        .into_iter()
+        .map(|flag| (flag, stdout(clocking(&["log", flag], dir.path()))))
+        .collect();
+    // ponytail: skip if midnight passed mid-test (the binary read a different date)
+    if day(0) != today {
+        return;
+    }
+    for (flag, o) in &outputs {
+        assert!(!o.contains("= 3 hr"), "{flag} has a lower bound: {o}");
+        assert!(o.contains("= 1 hr") == (*flag != "--yesterday"), "{flag} today: {o}");
+    }
+    assert!(outputs[1].1.contains("= 2 hr"), "--yesterday: {}", outputs[1].1);
+    assert!(!outputs[0].1.contains("= 2 hr"), "--today excludes yesterday: {}", outputs[0].1);
+}
+
+#[test]
+fn week_start_sunday_moves_the_week_window() {
+    let today = day(0);
+    let sunday_start = last(chrono::Weekday::Sun, today);
+    let monday_start = last(chrono::Weekday::Mon, today);
+    // The earlier of the two week starts is inside exactly one window.
+    let probe = sunday_start.min(monday_start);
+    for (week_start, start) in [("sunday", sunday_start), ("monday", monday_start)] {
+        let dir = tempdir().unwrap();
+        write_config(dir.path(), &format!("week_start = \"{week_start}\"\n"));
+        write_log(dir.path(), &session_on(probe, "4 hr"));
+        let o = stdout(clocking(&["log", "--week"], dir.path()));
+        // ponytail: skip if midnight passed mid-test (the binary read a different date)
+        if day(0) != today {
+            return;
+        }
+        assert_eq!(o.contains("= 4 hr"), probe >= start, "{week_start}: {o}");
+    }
+}
+
+#[test]
+fn undo_with_nothing_to_undo() {
+    let dir = tempdir().unwrap();
+    clocking(&["undo"], dir.path()).success().stdout("nothing to undo\n");
+}
+
+#[test]
+fn bare_status_warns_when_over_max_session() {
+    let dir = tempdir().unwrap();
+    write_config(dir.path(), "max_session = 60\n");
+    write_log(dir.path(), &open_marker_ago(90));
+    let o = stdout(clocking(&[], dir.path()));
+    assert!(o.contains("over max_session"), "{o}");
+    write_log(dir.path(), &open_marker_ago(30));
+    assert!(!stdout(clocking(&[], dir.path())).contains("over max_session"));
 }

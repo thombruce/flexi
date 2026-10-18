@@ -17,6 +17,11 @@ fn write_log(dir: &Path, content: &str) {
     fs::write(dir.join("holler").join("holler.txt"), content).unwrap();
 }
 
+fn write_config(dir: &Path, content: &str) {
+    fs::create_dir_all(dir.join("holler")).unwrap();
+    fs::write(dir.join("holler").join("holler.toml"), content).unwrap();
+}
+
 fn read_log(dir: &Path) -> String {
     fs::read_to_string(dir.join("holler").join("holler.txt")).unwrap()
 }
@@ -118,4 +123,14 @@ fn completions_and_man_smoke() {
     let dir = tempdir().unwrap();
     assert!(out(holler(&["completions", "bash"], dir.path())).contains("holler"));
     assert!(out(holler(&["man"], dir.path())).contains("holler"));
+}
+
+#[test]
+fn config_path_overrides_the_data_file() {
+    let dir = tempdir().unwrap();
+    let custom = dir.path().join("elsewhere").join("custom.txt");
+    write_config(dir.path(), &format!("path = '{}'\n", custom.display()));
+    holler(&["add", "John", "Smith"], dir.path()).success();
+    assert!(fs::read_to_string(&custom).unwrap().contains("John Smith"));
+    assert!(!dir.path().join("holler").join("holler.txt").exists());
 }
