@@ -54,56 +54,25 @@ impl LogEntry {
 }
 
 pub fn append_log(path: &Path, description: &str, ts_format: TimestampFormat) -> Result<()> {
-    if let Some(parent) = path.parent() {
-        std::fs::create_dir_all(parent)
-            .with_context(|| format!("creating directory {:?}", parent))?;
-    }
     let now = chrono::Local::now();
     let timestamp = match ts_format {
         TimestampFormat::Simple => now.format("%Y-%m-%d %H:%M").to_string(),
         TimestampFormat::Full => now.to_rfc3339_opts(chrono::SecondsFormat::Secs, false),
     };
-    let line = format!("{} {}\n", timestamp, description);
-    use std::io::Write;
-    let mut file = std::fs::OpenOptions::new()
-        .create(true)
-        .append(true)
-        .open(path)
-        .with_context(|| format!("opening {:?}", path))?;
-    file.write_all(line.as_bytes())
-        .with_context(|| format!("writing {:?}", path))
+    flexi_common::append_line(path, &format!("{} {}", timestamp, description))
 }
 
 pub fn read_log(path: &Path) -> Result<Vec<LogEntry>> {
-    if !path.exists() {
-        return Ok(vec![]);
-    }
-    let raw = std::fs::read_to_string(path)
-        .with_context(|| format!("reading {:?}", path))?;
-    raw.lines()
-        .filter(|l| !l.is_empty())
-        .map(parse_log_line)
-        .collect()
+    flexi_common::read_lines(path)?.iter().map(|l| parse_log_line(l)).collect()
 }
 
 pub fn pop_log(path: &Path) -> Result<Option<LogEntry>> {
-    if !path.exists() {
+    let mut lines = flexi_common::read_lines(path)?;
+    let Some(last) = lines.pop() else {
         return Ok(None);
-    }
-    let raw = std::fs::read_to_string(path)
-        .with_context(|| format!("reading {:?}", path))?;
-    let mut lines: Vec<&str> = raw.lines().filter(|l| !l.is_empty()).collect();
-    if lines.is_empty() {
-        return Ok(None);
-    }
-    let last = parse_log_line(lines.pop().unwrap())?;
-    let tmp = path.with_extension("tmp");
-    let content = lines.join("\n");
-    let content = if content.is_empty() { content } else { content + "\n" };
-    std::fs::write(&tmp, content)
-        .with_context(|| format!("writing {:?}", tmp))?;
-    std::fs::rename(&tmp, path)
-        .with_context(|| format!("renaming {:?} to {:?}", tmp, path))?;
+    };
+    let last = parse_log_line(&last)?;
+    flexi_common::write_lines(path, &lines)?;
     Ok(Some(last))
 }
 

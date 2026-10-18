@@ -149,7 +149,7 @@ fn main() -> Result<()> {
             let line = args.join(" ");
             let contact = Contact::parse(&line)?;
             let rendered = contact.to_line();
-            storage::append_contact(&cfg.path, &rendered)?;
+            storage::append_line(&cfg.path, &rendered)?;
             println!("added: {rendered}");
         }
         Some(Commands::Rm { index }) => {
@@ -162,11 +162,7 @@ fn main() -> Result<()> {
             println!("removed: {}", target.to_line());
         }
         Some(Commands::Edit) => {
-            let editor = std::env::var("EDITOR").unwrap_or_else(|_| "vi".to_string());
-            std::process::Command::new(&editor)
-                .arg(&cfg.path)
-                .status()
-                .with_context(|| format!("failed to launch editor {:?}", editor))?;
+            flexi_common::open_in_editor(&cfg.path)?;
         }
         Some(Commands::Phone { query }) => run_lookup(&cfg, Field::Phone, &query.join(" "))?,
         Some(Commands::Email { query }) => run_lookup(&cfg, Field::Email, &query.join(" "))?,

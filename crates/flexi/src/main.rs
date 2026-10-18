@@ -610,11 +610,7 @@ fn main() -> Result<()> {
             run_log(&cfg, &filter, false, true, false)?;
         }
         Some(Commands::Edit) => {
-            let editor = std::env::var("EDITOR").unwrap_or_else(|_| "vi".to_string());
-            std::process::Command::new(&editor)
-                .arg(&cfg.path)
-                .status()
-                .with_context(|| format!("failed to launch editor {:?}", editor))?;
+            flexi_common::open_in_editor(&cfg.path)?;
         }
         Some(Commands::Undo) => {
             match storage::pop_log(&cfg.path)? {

@@ -303,7 +303,7 @@ fn main() -> Result<()> {
             anyhow::ensure!(!title.trim().is_empty(), "an appointment needs a title");
             anyhow::ensure!(!title.contains(['\n', '\r']), "title must not contain newlines");
             let appt = Appt { date, start, end, title: title.clone(), raw: String::new() };
-            storage::append_appt(&cfg.path, &appt)?;
+            storage::append_line(&cfg.path, &appt.to_line())?;
             println!("added: {}", render_inline(&appt));
         }
         Some(Commands::Rm { index }) => {
@@ -317,11 +317,7 @@ fn main() -> Result<()> {
             println!("removed: {}", shown);
         }
         Some(Commands::Edit) => {
-            let editor = std::env::var("EDITOR").unwrap_or_else(|_| "vi".to_string());
-            std::process::Command::new(&editor)
-                .arg(&cfg.path)
-                .status()
-                .with_context(|| format!("failed to launch editor {:?}", editor))?;
+            flexi_common::open_in_editor(&cfg.path)?;
         }
         Some(Commands::Completions { .. }) | Some(Commands::Man) => unreachable!(),
     }

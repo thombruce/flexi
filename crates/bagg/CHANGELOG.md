@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- Adding an entry to a hand-edited file that lacks a final newline no longer glues the new line onto the last one.
+- `edit` now honours an `$EDITOR` that carries arguments (e.g. `code -w`), and reports an error if the editor exits non-zero.
+
 ## [0.3.0] - 2026-07-26
 
 ### Added

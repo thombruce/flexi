@@ -12,14 +12,15 @@ Cargo workspace (`Cargo.toml` at root, `members = ["crates/*"]`). Each tool is i
 - `crates/bagg` — a plaintext shopping list / wishlist.
 - `crates/holler` — a plaintext contacts / rolodex.
 - `crates/toodles` — a plaintext todo list (todo.txt + due date).
+- `crates/flexi-common` — library crate (no binary): the plumbing all six tools share.
 
 All six share the same plaintext-file + XDG-config approach. What's copied vs. divergent:
 
-- `config.rs` — the XDG path-discovery + toml pattern is copied into each crate (with the crate name and the relevant keys). This is the code most repeated across all six.
+- `config.rs` — each crate keeps its own `RawConfig`/`ResolvedConfig` structs and `resolve()` validation, but loads via `flexi_common::load_config::<RawConfig>("<tool>")` and defaults the data path via `flexi_common::default_data_path("<tool>")`.
 - `time.rs` (duration parse/format/round) is shared by flexi and clocking only; **calchemy, bagg, holler, and toodles have no `time.rs`** — calchemy and toodles parse dates via chrono rather than durations, and neither bagg nor holler have a time dimension at all.
 - `storage.rs` is **not** shared — each crate's storage semantics differ: flexi keeps a running-balance chain (tail = state via `new_minutes()`); clocking records session durations summed over a period (`session_minutes()`); calchemy holds an unordered set of `Appt` records parsed and sorted by datetime, with `add`/`rm`/`edit` rewriting arbitrary lines rather than appending to a derived chain; bagg holds an unordered set of `Item` records parsed and sorted by status/priority/price (same shape as calchemy's set-of-records model, different sort key and no dates); holler holds an unordered set of `Contact` records with no positional grammar at all beyond extraction — sorted alphabetically by name, the only universal field; toodles holds an unordered set of `Todo` records — bagg's model with dates in place of price/qty.
 
-The duplication is **deliberate** (rule of three, now rule of five). The candidate for a shared crate is the config-discovery + atomic-write plumbing (repeated 5×), **not** duration parsing (only 2×). This was measured and **explicitly deferred**: the truly-identical surface is only ~25 lines (the two `xdg_*_dir` helpers, the `tmp`+`rename` core, and the toml-load skeleton) — the config structs, `resolve()` validation, and storage semantics all diverge per crate. Extracting would add a 6th crate that must itself be **published to crates.io** before the five bins can publish (a path dep needs a released version), coupling every shared-code change to a publish-then-bump-dependents dance. Not worth it for ~25 lines of inert primitives. **The fifth tool (holler) has now landed** — this was the most-recently-named revisit trigger, and the call stands: still not worth extracting for ~25 lines. Next trigger: **the same `tmp`+`rename` bug gets fixed more than once**, or a sixth tool lands. **The sixth tool (toodles) is now landing** — the call is due for revisit; until revisited, toodles copies the plumbing like the other five. If/when extracted, keep it minimal (`write_atomic`, the xdg helpers, `load_toml::<T>`); per-crate config structs and storage stay put.
+**`flexi-common`** holds only the plumbing that was byte-identical across all six crates: `xdg_config_dir`/`xdg_data_dir`, `default_data_path`, `load_config::<T>`, `read_lines` (non-blank lines), `append_line` (repairs a missing final newline before appending), atomic `.tmp`+rename `write_lines`, `remove_line`/`replace_line`, and `open_in_editor` (splits `$EDITOR` args, fails on non-zero exit). It was extracted once toodles became the sixth tool, and a review found the same append bug in all six copies. Before that it was deliberately deferred: the shared surface is small, and the shared crate must be **published to crates.io before any dependent bin can publish**. Keep it minimal. Per-crate config structs, validation, and storage semantics stay in each crate. Set-of-records crates (calchemy, bagg, holler, toodles) re-export the line primitives they use from `storage.rs` (`pub use flexi_common::{append_line, ...}`), so `main.rs` still calls `storage::*`. flexi/clocking wrap them in `append_log`/`read_log`/`pop_log`. `tags.rs` and `time.rs` are still copied, not shared: they're domain code, not plumbing.
 
 ## The `toodles` crate
 
@@ -125,12 +126,14 @@ Each crate versions, changelogs, and releases independently. Add notable changes
 
 Before tagging a crate, move its `CHANGELOG.md` `[Unreleased]` section to a new version heading with today's date, bump the version in that crate's `Cargo.toml`, then build to update `Cargo.lock` (one lockfile at the workspace root). Commit all together.
 
+**`flexi-common` ordering:** bins depend on it as `{ path = "../flexi-common", version = "X.Y.Z" }`. `cargo publish` of a bin resolves that version from crates.io, so a `flexi-common` change that a bin needs must be tagged and published **first** (`flexi-common-vX.Y.Z`), then the bins bumped and released. A library tag only runs the crates.io job; `release.yml` skips the binary, GitHub Release, and Homebrew jobs when `crates/<crate>/src/main.rs` doesn't exist.
+
 **Tag scheme:** `<crate>-vX.Y.Z` (e.g. `flexi-v0.15.0`, `clocking-v0.2.0`). `.github/workflows/release.yml` is a single generic workflow triggered by any `*-vX.Y.Z` tag; its `setup` job derives the crate name and version from the tag (`crate = ${TAG%-v*}`, `version = ${TAG##*-v}`) and every downstream job is parameterised on them. To release: `git tag <crate>-vX.Y.Z && git push origin <crate>-vX.Y.Z` (push the one tag, not `--tags`).
 
 - **GitHub Release** — builds the four target archives (`<crate>-vX.Y.Z-<target>.tar.gz`) and attaches them.
 - **crates.io** — `cargo publish -p <crate>` (requires the `CARGO_REGISTRY_TOKEN` secret). Manual fallback: same command locally after `cargo login`.
 - **Homebrew tap** — writes `Formula/<crate>.rb` (class = capitalised crate, `desc` read from the crate's `Cargo.toml`, `test` runs `<crate> --version`) and pushes to `thombruce/homebrew-tap`.
 
-Adding a new crate needs no workflow edits — it releases as soon as you push a `<crate>-vX.Y.Z` tag.
+Adding a new bin crate needs no workflow edits — it releases as soon as you push a `<crate>-vX.Y.Z` tag.
 
 After tagging, confirm all three outputs landed: the GitHub Release assets, the crates.io version, and the homebrew formula. Note: the crates.io API needs a `User-Agent` header (`curl -s -H "User-Agent: check" https://crates.io/api/v1/crates/<crate>`) or it returns an error body instead of JSON.

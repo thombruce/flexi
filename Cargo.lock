@@ -132,12 +132,11 @@ dependencies = [
  "clap",
  "clap_complete",
  "clap_mangen",
- "dirs",
+ "flexi-common",
  "owo-colors",
  "predicates",
  "serde",
  "tempfile",
- "toml",
 ]
 
 [[package]]
@@ -185,12 +184,11 @@ dependencies = [
  "clap",
  "clap_complete",
  "clap_mangen",
- "dirs",
+ "flexi-common",
  "owo-colors",
  "predicates",
  "serde",
  "tempfile",
- "toml",
 ]
 
 [[package]]
@@ -300,12 +298,11 @@ dependencies = [
  "clap",
  "clap_complete",
  "clap_mangen",
- "dirs",
+ "flexi-common",
  "owo-colors",
  "predicates",
  "serde",
  "tempfile",
- "toml",
 ]
 
 [[package]]
@@ -442,10 +439,20 @@ dependencies = [
  "clap",
  "clap_complete",
  "clap_mangen",
- "dirs",
+ "flexi-common",
  "owo-colors",
  "serde",
  "serde_json",
+ "tempfile",
+]
+
+[[package]]
+name = "flexi-common"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "dirs",
+ "serde",
  "tempfile",
  "toml",
 ]
@@ -570,12 +577,11 @@ dependencies = [
  "clap",
  "clap_complete",
  "clap_mangen",
- "dirs",
+ "flexi-common",
  "owo-colors",
  "predicates",
  "serde",
  "tempfile",
- "toml",
 ]
 
 [[package]]
@@ -1285,12 +1291,11 @@ dependencies = [
  "clap",
  "clap_complete",
  "clap_mangen",
- "dirs",
+ "flexi-common",
  "owo-colors",
  "predicates",
  "serde",
  "tempfile",
- "toml",
 ]
 
 [[package]]

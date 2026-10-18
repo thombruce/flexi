@@ -1,5 +1,8 @@
-use anyhow::{Context, Result};
+use anyhow::Result;
 use std::path::Path;
+
+use flexi_common::read_lines;
+pub use flexi_common::{append_line, remove_line, replace_line};
 
 /// The decimal shape a price is parsed/formatted with — configurable so a
 /// user's own locale convention (separator character, decimal-place count)
@@ -183,63 +186,8 @@ fn parse_qty_tag(s: &str) -> Option<u32> {
     rest.parse().ok()
 }
 
-fn read_lines(path: &Path) -> Result<Vec<String>> {
-    if !path.exists() {
-        return Ok(vec![]);
-    }
-    let raw = std::fs::read_to_string(path).with_context(|| format!("reading {:?}", path))?;
-    Ok(raw.lines().filter(|l| !l.trim().is_empty()).map(str::to_string).collect())
-}
-
 pub fn read_items(path: &Path, fmt: PriceFormat) -> Result<Vec<Item>> {
     read_lines(path)?.iter().map(|l| Item::parse(l, fmt)).collect()
-}
-
-/// Appends an already-rendered line (see `Item::to_line`).
-pub fn append_item(path: &Path, line: &str) -> Result<()> {
-    if let Some(parent) = path.parent() {
-        std::fs::create_dir_all(parent).with_context(|| format!("creating directory {:?}", parent))?;
-    }
-    use std::io::Write;
-    let mut file = std::fs::OpenOptions::new()
-        .create(true)
-        .append(true)
-        .open(path)
-        .with_context(|| format!("opening {:?}", path))?;
-    writeln!(file, "{}", line).with_context(|| format!("writing {:?}", path))
-}
-
-/// Rewrites the file to exactly `lines` (atomic via a `.tmp` swap).
-pub fn write_lines(path: &Path, lines: &[String]) -> Result<()> {
-    if let Some(parent) = path.parent() {
-        std::fs::create_dir_all(parent).with_context(|| format!("creating directory {:?}", parent))?;
-    }
-    let tmp = path.with_extension("tmp");
-    let mut content = lines.join("\n");
-    if !content.is_empty() {
-        content.push('\n');
-    }
-    std::fs::write(&tmp, content).with_context(|| format!("writing {:?}", tmp))?;
-    std::fs::rename(&tmp, path).with_context(|| format!("renaming {:?} to {:?}", tmp, path))
-}
-
-/// Removes the first line exactly equal to `raw`.
-pub fn remove_line(path: &Path, raw: &str) -> Result<()> {
-    let mut lines = read_lines(path)?;
-    if let Some(pos) = lines.iter().position(|l| l == raw) {
-        lines.remove(pos);
-    }
-    write_lines(path, &lines)
-}
-
-/// Replaces the first line exactly equal to `old_raw` with `new_line`,
-/// preserving file order.
-pub fn replace_line(path: &Path, old_raw: &str, new_line: &str) -> Result<()> {
-    let mut lines = read_lines(path)?;
-    if let Some(pos) = lines.iter().position(|l| l == old_raw) {
-        lines[pos] = new_line.to_string();
-    }
-    write_lines(path, &lines)
 }
 
 #[cfg(test)]

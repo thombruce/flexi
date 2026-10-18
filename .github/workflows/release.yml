@@ -2,6 +2,8 @@ name: Release
 
 # Per-crate tags: `<crate>-vX.Y.Z` (e.g. `flexi-v0.15.0`, `clocking-v0.1.0`).
 # The crate name and version are derived from the tag by the `setup` job.
+# Library crates (no src/main.rs, e.g. flexi-common) only publish to crates.io;
+# the binary, GitHub Release, and Homebrew jobs are skipped for them.
 on:
   push:
     tags:
@@ -17,16 +19,22 @@ jobs:
     outputs:
       crate: ${{ steps.parse.outputs.crate }}
       version: ${{ steps.parse.outputs.version }}
+      bin: ${{ steps.parse.outputs.bin }}
     steps:
+      - uses: actions/checkout@v5
+
       - id: parse
         run: |
           TAG="${{ github.ref_name }}"
-          echo "crate=${TAG%-v*}" >> "$GITHUB_OUTPUT"
+          CRATE="${TAG%-v*}"
+          echo "crate=$CRATE" >> "$GITHUB_OUTPUT"
           echo "version=${TAG##*-v}" >> "$GITHUB_OUTPUT"
+          if [ -f "crates/$CRATE/src/main.rs" ]; then echo "bin=true"; else echo "bin=false"; fi >> "$GITHUB_OUTPUT"
 
   build:
     name: Build ${{ needs.setup.outputs.crate }} ${{ matrix.target }}
     needs: setup
+    if: needs.setup.outputs.bin == 'true'
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:
