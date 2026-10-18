@@ -610,7 +610,7 @@ fn main() -> Result<()> {
             run_log(&cfg, &filter, false, true, false)?;
         }
         Some(Commands::Edit) => {
-            flexi_common::open_in_editor(&cfg.path)?;
+            foolscap::open_in_editor(&cfg.path)?;
         }
         Some(Commands::Undo) => {
             match storage::pop_log(&cfg.path)? {

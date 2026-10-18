@@ -179,7 +179,7 @@ fn main() -> Result<()> {
             println!("removed: {}", todo.to_line());
         }
         Some(Commands::Edit) => {
-            flexi_common::open_in_editor(&cfg.path)?;
+            foolscap::open_in_editor(&cfg.path)?;
         }
         Some(Commands::Completions { .. }) | Some(Commands::Man) => unreachable!(),
     }

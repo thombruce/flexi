@@ -2,8 +2,8 @@ use anyhow::Result;
 use chrono::NaiveDate;
 use std::path::Path;
 
-use flexi_common::read_lines;
-pub use flexi_common::{append_line, remove_line, replace_line};
+use foolscap::read_lines;
+pub use foolscap::{append_line, remove_line, replace_line};
 
 /// One todo, parsed from a line `[x ][(A) ][CLOSED ][CREATED ][DUE ]TITLE`.
 ///

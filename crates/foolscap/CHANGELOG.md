@@ -10,4 +10,4 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 
 - Initial version: the plumbing shared by the flexi family of tools, extracted from six identical copies. XDG path discovery (`xdg_config_dir`, `xdg_data_dir`, `default_data_path`), toml config loading (`load_config::<T>`), line I/O (`read_lines`, `append_line`, and atomic `.tmp`+rename `write_lines`/`remove_line`/`replace_line`), and `open_in_editor`.
-- `append_line` inserts a missing final newline before appending, and `open_in_editor` splits `$EDITOR` arguments and fails on a non-zero exit. Both fix bugs that were present in every copy.
+- Fixes for bugs that were present in every copy: `append_line` inserts a missing final newline before appending; `write_lines` names its temp file `<file>.tmp` instead of replacing the extension; and `open_in_editor` runs `$EDITOR` through `sh` (arguments and quoted paths work) and only warns on a non-zero exit.

@@ -13,7 +13,7 @@ name = "flexi"
 path = "src/main.rs"
 
 [dependencies]
-flexi-common = { path = "../flexi-common", version = "0.1.0" }
+foolscap = { path = "../foolscap", version = "0.1.0" }
 anyhow = "1"
 chrono = "0.4"
 arboard = "3"

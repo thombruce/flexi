@@ -1,5 +1,5 @@
 [package]
-name = "flexi-common"
+name = "foolscap"
 version = "0.1.0"
 edition = "2021"
 description = "Shared plumbing (XDG paths, config loading, atomic line I/O) for the flexi family of plaintext CLI tools"

@@ -36,11 +36,11 @@ pub struct ResolvedConfig {
 }
 
 pub fn resolve() -> Result<ResolvedConfig> {
-    let raw: RawConfig = flexi_common::load_config("clocking")?;
+    let raw: RawConfig = foolscap::load_config("clocking")?;
 
     let path = match raw.path {
         Some(p) => p,
-        None => flexi_common::default_data_path("clocking")?,
+        None => foolscap::default_data_path("clocking")?,
     };
 
     let increment = raw.increment.unwrap_or(1);

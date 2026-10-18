@@ -169,7 +169,7 @@ fn main() -> Result<()> {
             println!("removed: {}", item.to_line(fmt, cfg.always_show_unspecified_price));
         }
         Some(Commands::Edit) => {
-            flexi_common::open_in_editor(&cfg.path)?;
+            foolscap::open_in_editor(&cfg.path)?;
         }
         Some(Commands::Completions { .. }) | Some(Commands::Man) => unreachable!(),
     }

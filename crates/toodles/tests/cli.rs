@@ -95,3 +95,32 @@ fn list_filters_by_status_and_tag_without_renumbering() {
     let done = out(toodles(&["list", "--done"], dir.path()));
     assert!(done.contains("3  x Gutters +house"), "{done}");
 }
+
+#[test]
+fn edit_runs_editor_through_the_shell() {
+    let dir = tempdir().unwrap();
+    write_log(dir.path(), "Old\n");
+    Command::cargo_bin("toodles")
+        .unwrap()
+        .env("XDG_DATA_HOME", dir.path())
+        .env("XDG_CONFIG_HOME", dir.path())
+        .env("EDITOR", "echo Edited >")
+        .arg("edit")
+        .assert()
+        .success();
+    assert_eq!(read_log(dir.path()).trim(), "Edited");
+}
+
+#[test]
+fn edit_warns_but_succeeds_on_editor_failure() {
+    let dir = tempdir().unwrap();
+    Command::cargo_bin("toodles")
+        .unwrap()
+        .env("XDG_DATA_HOME", dir.path())
+        .env("XDG_CONFIG_HOME", dir.path())
+        .env("EDITOR", "false")
+        .arg("edit")
+        .assert()
+        .success()
+        .stderr(predicates::str::contains("warning: editor"));
+}

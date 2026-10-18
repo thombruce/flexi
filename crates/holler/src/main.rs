@@ -162,7 +162,7 @@ fn main() -> Result<()> {
             println!("removed: {}", target.to_line());
         }
         Some(Commands::Edit) => {
-            flexi_common::open_in_editor(&cfg.path)?;
+            foolscap::open_in_editor(&cfg.path)?;
         }
         Some(Commands::Phone { query }) => run_lookup(&cfg, Field::Phone, &query.join(" "))?,
         Some(Commands::Email { query }) => run_lookup(&cfg, Field::Email, &query.join(" "))?,

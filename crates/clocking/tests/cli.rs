@@ -238,3 +238,11 @@ fn undo_removes_last_entry() {
         .stdout(predicates::str::contains("removed:"));
     assert!(read_log(dir.path()).trim().is_empty());
 }
+
+#[test]
+fn whitespace_only_tail_line_is_skipped() {
+    let dir = tempdir().unwrap();
+    write_log(dir.path(), &format!("{}\n   \n", open_marker_ago(30)));
+    clocking(&["out"], dir.path()).success();
+    assert!(!read_log(dir.path()).contains("@in"));
+}

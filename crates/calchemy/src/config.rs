@@ -22,11 +22,11 @@ pub struct ResolvedConfig {
 }
 
 pub fn resolve() -> Result<ResolvedConfig> {
-    let raw: RawConfig = flexi_common::load_config("calchemy")?;
+    let raw: RawConfig = foolscap::load_config("calchemy")?;
 
     let path = match raw.path {
         Some(p) => p,
-        None => flexi_common::default_data_path("calchemy")?,
+        None => foolscap::default_data_path("calchemy")?,
     };
 
     Ok(ResolvedConfig {

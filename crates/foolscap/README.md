@@ -1,4 +1,4 @@
-# flexi-common
+# foolscap
 
 Shared plumbing for the [flexi](../../) family of plaintext CLI tools: XDG path discovery, toml config loading, line-oriented file I/O with atomic rewrites, and `$EDITOR` launching.
 

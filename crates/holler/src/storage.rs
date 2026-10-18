@@ -1,8 +1,8 @@
 use anyhow::Result;
 use std::path::Path;
 
-use flexi_common::read_lines;
-pub use flexi_common::{append_line, remove_line};
+use foolscap::read_lines;
+pub use foolscap::{append_line, remove_line};
 
 /// One contact, parsed from a line `NAME [phone:VALUE]... [email:VALUE]...`.
 ///

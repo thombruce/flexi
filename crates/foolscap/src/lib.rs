@@ -82,7 +82,11 @@ pub fn append_line(path: &Path, line: &str) -> Result<()> {
 /// Rewrites the file to exactly `lines` (atomic via a `.tmp` swap).
 pub fn write_lines(path: &Path, lines: &[String]) -> Result<()> {
     create_parent(path)?;
-    let tmp = path.with_extension("tmp");
+    // Append rather than replace the extension, so `a.txt` and `a.todo`
+    // don't share a temp file and `a.tmp` isn't its own temp file.
+    let mut tmp = path.as_os_str().to_owned();
+    tmp.push(".tmp");
+    let tmp = PathBuf::from(tmp);
     let mut content = lines.join("\n");
     if !content.is_empty() {
         content.push('\n');
@@ -110,19 +114,22 @@ pub fn replace_line(path: &Path, old_raw: &str, new_line: &str) -> Result<()> {
     write_lines(path, &lines)
 }
 
-/// Opens `path` in `$EDITOR` (default `vi`). The variable may carry
-/// arguments (`code -w`) — split on whitespace, so an editor path that
-/// itself contains spaces isn't supported. Fails if the editor exits non-zero.
+/// Opens `path` in `$EDITOR` (default `vi`), run through `sh` the way git
+/// does, so it may carry arguments (`code -w`) or a quoted path with spaces.
+/// A non-zero exit only warns: the file is already saved by then, and vim
+/// exits non-zero for things like a vimrc error.
 pub fn open_in_editor(path: &Path) -> Result<()> {
     let editor = std::env::var("EDITOR").ok().filter(|e| !e.trim().is_empty()).unwrap_or_else(|| "vi".to_string());
-    let mut words = editor.split_whitespace();
-    let program = words.next().expect("editor is non-blank");
-    let status = std::process::Command::new(program)
-        .args(words)
+    let status = std::process::Command::new("sh")
+        .arg("-c")
+        .arg(format!("{editor} \"$@\""))
+        .arg(&editor)
         .arg(path)
         .status()
         .with_context(|| format!("failed to launch editor {:?}", editor))?;
-    anyhow::ensure!(status.success(), "editor {:?} exited with {}", editor, status);
+    if !status.success() {
+        eprintln!("warning: editor {:?} exited with {}", editor, status);
+    }
     Ok(())
 }
 
@@ -141,6 +148,15 @@ mod tests {
     }
 
     #[test]
+    fn write_lines_temp_file_keeps_the_extension() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("f.tmp");
+        write_lines(&path, &["a".into()]).unwrap();
+        assert_eq!(read_lines(&path).unwrap(), ["a"]);
+        assert!(!dir.path().join("f.tmp.tmp").exists());
+    }
+
+    #[test]
     fn line_rewrites_preserve_order() {
         let dir = tempfile::tempdir().unwrap();
         let path = dir.path().join("f.txt");
@@ -148,6 +164,6 @@ mod tests {
         replace_line(&path, "b", "B").unwrap();
         remove_line(&path, "a").unwrap();
         assert_eq!(read_lines(&path).unwrap(), ["B", "c"]);
-        assert!(!path.with_extension("tmp").exists());
+        assert!(!dir.path().join("f.txt.tmp").exists());
     }
 }

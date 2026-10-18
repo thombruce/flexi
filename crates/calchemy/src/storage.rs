@@ -2,8 +2,8 @@ use anyhow::{Context, Result};
 use chrono::{NaiveDate, NaiveDateTime, NaiveTime};
 use std::path::Path;
 
-use flexi_common::read_lines;
-pub use flexi_common::{append_line, remove_line};
+use foolscap::read_lines;
+pub use foolscap::{append_line, remove_line};
 
 /// One appointment, parsed from a line `DATE [START [END]] TITLE`.
 ///

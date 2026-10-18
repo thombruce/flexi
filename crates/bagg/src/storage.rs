@@ -1,8 +1,8 @@
 use anyhow::Result;
 use std::path::Path;
 
-use flexi_common::read_lines;
-pub use flexi_common::{append_line, remove_line, replace_line};
+use foolscap::read_lines;
+pub use foolscap::{append_line, remove_line, replace_line};
 
 /// The decimal shape a price is parsed/formatted with — configurable so a
 /// user's own locale convention (separator character, decimal-place count)

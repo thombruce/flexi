@@ -12,11 +12,11 @@ pub struct ResolvedConfig {
 }
 
 pub fn resolve() -> Result<ResolvedConfig> {
-    let raw: RawConfig = flexi_common::load_config("toodles")?;
+    let raw: RawConfig = foolscap::load_config("toodles")?;
 
     let path = match raw.path {
         Some(p) => p,
-        None => flexi_common::default_data_path("toodles")?,
+        None => foolscap::default_data_path("toodles")?,
     };
 
     Ok(ResolvedConfig { path })

@@ -2,7 +2,7 @@ name: Release
 
 # Per-crate tags: `<crate>-vX.Y.Z` (e.g. `flexi-v0.15.0`, `clocking-v0.1.0`).
 # The crate name and version are derived from the tag by the `setup` job.
-# Library crates (no src/main.rs, e.g. flexi-common) only publish to crates.io;
+# Library crates (no src/main.rs, e.g. foolscap) only publish to crates.io;
 # the binary, GitHub Release, and Homebrew jobs are skipped for them.
 on:
   push:
