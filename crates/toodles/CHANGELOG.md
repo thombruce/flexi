@@ -9,7 +9,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-- Lines may start with `!` (focus) or `~` (obsolete, won't do) as well as `x`, at most one per line. Todos sort focused, open, done, then obsolete. Obsolete todos take a closed date like done ones. `--open` includes focused todos. Commands to set them come separately (#41); for now, add the marker with `toodles edit`.
+- Lines may start with `!` (focus) or `~` (obsolete, won't do) as well as `x`, at most one per line. Todos sort focused, open, done, then obsolete. Obsolete todos take a closed date like done ones. `--open` includes focused todos.
+- `toodles focus <n>` and `toodles wont <n>` toggle a todo's focus (`!`) or won't-do (`~`) status; running one again reopens it. `~` stamps the closed date, like `done`. `list --wont` shows only won't-do todos.
 - `list` tag queries now also match `#hashtag` tags (a `#` followed by a word starting with a letter, e.g. `#urgent`; `#42` isn't one). Quote it on the command line (`list '#urgent'`), or the shell treats it as a comment.
 
 ## [0.1.0] - 2026-10-18

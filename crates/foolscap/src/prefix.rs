@@ -27,6 +27,17 @@ impl Status {
         matches!(self, Status::Done | Status::Obsolete)
     }
 
+    /// The status after toggling towards `to`: `to`, or back to open if the
+    /// record already has it. A tool's `done`/`focus`/`wont`-style commands
+    /// all toggle this way.
+    pub fn toggled(self, to: Status) -> Status {
+        if self == to {
+            Status::Open
+        } else {
+            to
+        }
+    }
+
     fn marker(self) -> Option<&'static str> {
         match self {
             Status::Focus => Some("!"),
@@ -149,6 +160,15 @@ mod tests {
         assert!(Status::Done < Status::Obsolete);
         assert!(Status::Done.is_closed() && Status::Obsolete.is_closed());
         assert!(!Status::Focus.is_closed() && !Status::Open.is_closed());
+    }
+
+    #[test]
+    fn toggled_sets_or_reopens() {
+        assert_eq!(Status::Open.toggled(Status::Focus), Status::Focus);
+        assert_eq!(Status::Focus.toggled(Status::Focus), Status::Open);
+        assert_eq!(Status::Focus.toggled(Status::Done), Status::Done);
+        assert_eq!(Status::Done.toggled(Status::Obsolete), Status::Obsolete);
+        assert_eq!(Status::Obsolete.toggled(Status::Obsolete), Status::Open);
     }
 
     #[test]

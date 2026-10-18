@@ -162,3 +162,30 @@ fn list_filters_by_hashtag() {
     assert!(!listing.contains("issue"), "{listing}");
     assert!(out(toodles(&["list", "#42"], dir.path())).trim().is_empty());
 }
+
+#[test]
+fn focus_and_wont_toggle_with_closed_dates() {
+    let dir = tempdir().unwrap();
+    write_log(dir.path(), "2024-09-01 Write report\n");
+    toodles(&["focus", "1"], dir.path()).success();
+    assert_eq!(read_log(dir.path()).trim(), "! 2024-09-01 Write report");
+    toodles(&["wont", "1"], dir.path()).success();
+    assert_eq!(read_log(dir.path()).trim(), format!("~ {} 2024-09-01 Write report", today()));
+    toodles(&["wont", "1"], dir.path()).success();
+    assert_eq!(read_log(dir.path()).trim(), "2024-09-01 Write report");
+    toodles(&["focus", "1"], dir.path()).success();
+    toodles(&["focus", "1"], dir.path()).success();
+    assert_eq!(read_log(dir.path()).trim(), "2024-09-01 Write report");
+}
+
+#[test]
+fn list_wont_shows_only_obsolete() {
+    let dir = tempdir().unwrap();
+    write_log(dir.path(), "~ Learn Esperanto\nx Pay rent\n! Write report\n");
+    let wont = out(toodles(&["list", "--wont"], dir.path()));
+    assert!(wont.contains("3  ~ Learn Esperanto"), "{wont}");
+    assert!(!wont.contains("rent") && !wont.contains("report"), "{wont}");
+    let open = out(toodles(&["list", "--open"], dir.path()));
+    assert!(open.contains("1  ! Write report") && !open.contains("Esperanto"), "{open}");
+    toodles(&["list", "--wont", "--done"], dir.path()).failure();
+}

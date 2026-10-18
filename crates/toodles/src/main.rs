@@ -30,7 +30,7 @@ enum Commands {
         #[arg(required = true)]
         title: Vec<String>,
     },
-    /// List todos (everything, sorted; `--open`/`--done` to filter)
+    /// List todos (everything, sorted; `--open`/`--done`/`--wont` to filter)
     List {
         #[command(flatten)]
         filter: TodoFilter,
@@ -40,6 +40,16 @@ enum Commands {
     },
     /// Toggle done/open for the todo at this position in `list`
     Done {
+        /// The todo's index as shown by `toodles list`
+        index: usize,
+    },
+    /// Toggle focus (`!`, working on it now) for the todo at this position in `list`
+    Focus {
+        /// The todo's index as shown by `toodles list`
+        index: usize,
+    },
+    /// Toggle won't-do (`~`, obsolete but kept) for the todo at this position in `list`
+    Wont {
         /// The todo's index as shown by `toodles list`
         index: usize,
     },
@@ -61,12 +71,15 @@ enum Commands {
 
 #[derive(Args)]
 struct TodoFilter {
-    /// Only open todos
-    #[arg(long, conflicts_with = "done")]
+    /// Only open todos (including focused)
+    #[arg(long, conflicts_with_all = ["done", "wont"])]
     open: bool,
     /// Only done todos
-    #[arg(long, conflicts_with = "open")]
+    #[arg(long, conflicts_with_all = ["open", "wont"])]
     done: bool,
+    /// Only won't-do (obsolete) todos
+    #[arg(long, conflicts_with_all = ["open", "done"])]
+    wont: bool,
 }
 
 fn parse_date_arg(s: &str) -> Result<NaiveDate, String> {
@@ -90,6 +103,25 @@ fn find_todo(cfg: &config::ResolvedConfig, index: usize) -> Result<Todo> {
         .with_context(|| format!("no todo {} — run `toodles list`", index))
 }
 
+/// Toggles the todo at `index` towards `to` (or back to open), stamping the
+/// closed date when it becomes done or obsolete and clearing it otherwise.
+fn toggle_status(cfg: &config::ResolvedConfig, index: usize, to: Status, today: NaiveDate) -> Result<()> {
+    let mut todo = find_todo(cfg, index)?;
+    let old_raw = todo.raw.clone();
+    todo.status = todo.status.toggled(to);
+    todo.closed = todo.status.is_closed().then_some(today);
+    let new_line = todo.to_line();
+    storage::replace_line(&cfg.path, &old_raw, &new_line)?;
+    let label = match todo.status {
+        Status::Focus => "focused",
+        Status::Open => "reopened",
+        Status::Done => "done",
+        Status::Obsolete => "won't do",
+    };
+    println!("{}: {}", label, new_line);
+    Ok(())
+}
+
 fn run_list(cfg: &config::ResolvedConfig, filter: &TodoFilter, tag_queries: &[String]) -> Result<()> {
     let todos = all_sorted(cfg)?;
     if todos.is_empty() {
@@ -103,6 +135,9 @@ fn run_list(cfg: &config::ResolvedConfig, filter: &TodoFilter, tag_queries: &[St
             continue;
         }
         if filter.done && todo.status != Status::Done {
+            continue;
+        }
+        if filter.wont && todo.status != Status::Obsolete {
             continue;
         }
         if !tags::matches(&todo.title, tag_queries) {
@@ -140,7 +175,7 @@ fn main() -> Result<()> {
     let today = Local::now().date_naive();
 
     match cli.command {
-        None => run_list(&cfg, &TodoFilter { open: false, done: false }, &[])?,
+        None => run_list(&cfg, &TodoFilter { open: false, done: false, wont: false }, &[])?,
         Some(Commands::List { filter, tags }) => run_list(&cfg, &filter, &tags)?,
         Some(Commands::Add { priority, due, title }) => {
             let title = title.join(" ");
@@ -157,15 +192,9 @@ fn main() -> Result<()> {
             storage::append_line(&cfg.path, &line)?;
             println!("added: {}", line);
         }
-        Some(Commands::Done { index }) => {
-            let mut todo = find_todo(&cfg, index)?;
-            let old_raw = todo.raw.clone();
-            todo.status = if todo.status == Status::Done { Status::Open } else { Status::Done };
-            todo.closed = todo.status.is_closed().then_some(today);
-            let new_line = todo.to_line();
-            storage::replace_line(&cfg.path, &old_raw, &new_line)?;
-            println!("{}: {}", if todo.status == Status::Done { "done" } else { "reopened" }, new_line);
-        }
+        Some(Commands::Done { index }) => toggle_status(&cfg, index, Status::Done, today)?,
+        Some(Commands::Focus { index }) => toggle_status(&cfg, index, Status::Focus, today)?,
+        Some(Commands::Wont { index }) => toggle_status(&cfg, index, Status::Obsolete, today)?,
         Some(Commands::Rm { index }) => {
             let todo = find_todo(&cfg, index)?;
             storage::remove_line(&cfg.path, &todo.raw)?;

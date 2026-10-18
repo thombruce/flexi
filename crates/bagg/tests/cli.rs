@@ -190,3 +190,20 @@ fn out_of_range_decimal_places_config_rejected() {
     write_config(dir.path(), "decimal_places = 10\n");
     bagg(&["list"], dir.path()).failure().stderr(predicates::str::contains("invalid decimal_places"));
 }
+
+#[test]
+fn focus_and_wont_toggle_and_filter() {
+    let dir = tempdir().unwrap();
+    bagg(&["add", "Eggs"], dir.path()).success();
+    bagg(&["add", "Gadget"], dir.path()).success();
+    bagg(&["focus", "1"], dir.path()).success();
+    bagg(&["wont", "2"], dir.path()).success();
+    let log = read_log(dir.path());
+    assert!(log.contains("! Eggs") && log.contains("~ Gadget"), "{log}");
+    let wont = out(bagg(&["list", "--wont"], dir.path()));
+    assert!(wont.contains("~ Gadget") && !wont.contains("Eggs"), "{wont}");
+    let pending = out(bagg(&["list", "--pending"], dir.path()));
+    assert!(pending.contains("! Eggs") && !pending.contains("Gadget"), "{pending}");
+    bagg(&["got", "1"], dir.path()).success();
+    assert!(read_log(dir.path()).contains("x Eggs"));
+}
