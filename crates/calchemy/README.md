@@ -69,7 +69,7 @@ Appointments are always listed in chronological order regardless of their order 
 
 `rm <n>` removes the appointment at position `n` in the default `list` view (upcoming, chronological). For anything more involved, `calchemy edit` opens the raw file.
 
-`list` also takes `+project`, `@context`, or `key:value` tag queries (e.g. `calchemy list @clinic`), matched case-insensitively against tags embedded anywhere in the title — multiple queries match if the appointment carries any of them. Tags aren't a separate stored field; they're plain words in `TITLE`, parsed on the fly when filtering. A `key:value` token only counts as a tag when the key starts with a letter, so an ordinary time like `10:00` sitting in a title is never misread as one.
+`list` also takes `+project`, `@context`, `#hashtag`, or `key:value` tag queries (e.g. `calchemy list @clinic '#family'`), matched case-insensitively against tags embedded anywhere in the title — multiple queries match if the appointment carries any of them. Tags aren't a separate stored field; they're plain words in `TITLE`, parsed on the fly when filtering. A `key:value` token only counts as a tag when the key starts with a letter, so an ordinary time like `10:00` sitting in a title is never misread as one. A `#hashtag` must start with a letter (`#42` isn't one), and must be quoted on the command line (`'#urgent'`), or the shell treats it as a comment.
 
 ## Storage format
 

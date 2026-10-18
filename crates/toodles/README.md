@@ -55,7 +55,7 @@ toodles man                               # print the man page (roff) to stdout
 
 Todos are always listed sorted, regardless of their order in the file: open before done, then priority `A` before `B` before none, then soonest due date before later before undated. Open todos past their due date are shown in red. `--open`/`--done` and tag queries filter that same sorted listing without renumbering it, so `done`/`rm` always target what you expect.
 
-Tags (`+project`, `@context`, `key:value`) are plain words in the title, todo.txt's own convention, matched case-insensitively — multiple queries match if a todo carries any of them. A shared `+project` tag is how related todos are grouped; there's no nesting.
+Tags (`+project`, `@context`, `#hashtag`, `key:value`) are plain words in the title, todo.txt's own convention, matched case-insensitively — multiple queries match if a todo carries any of them. A shared `+project` tag is how related todos are grouped; there's no nesting. A `#hashtag` must start with a letter (`#42` isn't one), and must be quoted on the command line (`'#urgent'`), or the shell treats it as a comment.
 
 ## Storage format
 
