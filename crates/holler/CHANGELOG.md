@@ -10,7 +10,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 
 - Adding an entry to a hand-edited file that lacks a final newline no longer glues the new line onto the last one.
-- `edit` now runs `$EDITOR` through `sh`, as git does, so it may carry arguments (e.g. `code -w`) or a quoted path with spaces. A non-zero editor exit prints a warning.
+- `edit` now runs `$EDITOR` through `sh`, as git does, so it may carry arguments (e.g. `code -w`) or a path with spaces, which must be quoted inside `$EDITOR`. An editor that can't be run (exit 126/127, e.g. a typo) is an error; any other non-zero exit prints a warning.
 
 ## [0.1.0] - 2026-07-26
 

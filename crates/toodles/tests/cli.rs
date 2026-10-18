@@ -112,6 +112,20 @@ fn edit_runs_editor_through_the_shell() {
 }
 
 #[test]
+fn edit_fails_when_editor_is_missing() {
+    let dir = tempdir().unwrap();
+    Command::cargo_bin("toodles")
+        .unwrap()
+        .env("XDG_DATA_HOME", dir.path())
+        .env("XDG_CONFIG_HOME", dir.path())
+        .env("EDITOR", "nonexistent-editor-xyz")
+        .arg("edit")
+        .assert()
+        .failure()
+        .stderr(predicates::str::contains("could not run editor"));
+}
+
+#[test]
 fn edit_warns_but_succeeds_on_editor_failure() {
     let dir = tempdir().unwrap();
     Command::cargo_bin("toodles")

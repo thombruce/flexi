@@ -56,6 +56,8 @@ clocking completions <shell>  # print shell completion script
 clocking man               # print the man page (roff) to stdout
 ```
 
+`$EDITOR` is run through `sh`, as git does, so it may carry arguments (`EDITOR="code -w"`). An editor path containing spaces must be quoted inside it: `EDITOR='"/Applications/Sublime Text.app/Contents/SharedSupport/bin/subl" -w'`.
+
 `clocking in` opens a session; `clocking out` closes it and records the hours worked. Only one session is open at a time — a second `clocking in` is rejected until you clock out. While clocked in, bare `clocking` shows how long you've been clocked in; when clocked out it shows today's total. To discard an open session without recording it, run `clocking undo` while clocked in.
 
 A closed session is logged as `<clock-in> <end> = <duration>`, keyed by the time you clocked **in**:

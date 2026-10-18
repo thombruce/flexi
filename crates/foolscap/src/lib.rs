@@ -116,8 +116,10 @@ pub fn replace_line(path: &Path, old_raw: &str, new_line: &str) -> Result<()> {
 
 /// Opens `path` in `$EDITOR` (default `vi`), run through `sh` the way git
 /// does, so it may carry arguments (`code -w`) or a quoted path with spaces.
-/// A non-zero exit only warns: the file is already saved by then, and vim
-/// exits non-zero for things like a vimrc error.
+/// An editor path with spaces must be quoted inside `$EDITOR`. Exit 126/127
+/// (shell couldn't run the editor) is an error; any other non-zero exit
+/// only warns, since the file is already saved by then and vim exits
+/// non-zero for things like a vimrc error.
 pub fn open_in_editor(path: &Path) -> Result<()> {
     let editor = std::env::var("EDITOR").ok().filter(|e| !e.trim().is_empty()).unwrap_or_else(|| "vi".to_string());
     let status = std::process::Command::new("sh")
@@ -127,8 +129,10 @@ pub fn open_in_editor(path: &Path) -> Result<()> {
         .arg(path)
         .status()
         .with_context(|| format!("failed to launch editor {:?}", editor))?;
-    if !status.success() {
-        eprintln!("warning: editor {:?} exited with {}", editor, status);
+    match status.code() {
+        Some(126 | 127) => anyhow::bail!("could not run editor {:?} — check $EDITOR", editor),
+        Some(0) => {}
+        _ => eprintln!("warning: editor {:?} exited with {}", editor, status),
     }
     Ok(())
 }
