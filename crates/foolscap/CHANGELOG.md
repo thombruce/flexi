@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.2.0] - 2026-10-18
+
 ### Added
 
 - `tags` module: `tags::matches(text, queries)` finds todo.txt-style `+project`/`@context`/`key:value` tags, plus `#hashtag` (`#` then a letter; a bare `#` is never a tag, so it can't clash with ` # note`), in free text (case-insensitive, matching if any query is present). It was previously copied into bagg, calchemy, holler and toodles. This is the first building block beyond plumbing (#53).
