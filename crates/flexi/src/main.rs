@@ -16,16 +16,6 @@ struct Cli {
     command: Option<Commands>,
 }
 
-fn parse_note(s: &str) -> Result<String, String> {
-    if s.contains('\n') || s.contains('\r') {
-        return Err("note must not contain newlines".to_string());
-    }
-    if s.trim().is_empty() {
-        return Err("note must not be empty".to_string());
-    }
-    Ok(s.to_string())
-}
-
 #[derive(Subcommand)]
 enum Commands {
     /// Add time to your flexi balance
@@ -33,7 +23,7 @@ enum Commands {
         #[arg(required = true)]
         time: Vec<String>,
         /// Attach a note to this log entry
-        #[arg(long, short = 'm', value_parser = parse_note)]
+        #[arg(long, short = 'm', value_parser = foolscap::note::parse)]
         note: Option<String>,
     },
     /// Remove time from your flexi balance
@@ -42,7 +32,7 @@ enum Commands {
         #[arg(required = true)]
         time: Vec<String>,
         /// Attach a note to this log entry
-        #[arg(long, short = 'm', value_parser = parse_note)]
+        #[arg(long, short = 'm', value_parser = foolscap::note::parse)]
         note: Option<String>,
     },
     /// Set your flexi balance to an exact value
@@ -50,27 +40,27 @@ enum Commands {
         #[arg(required = true)]
         time: Vec<String>,
         /// Attach a note to this log entry
-        #[arg(long, short = 'm', value_parser = parse_note)]
+        #[arg(long, short = 'm', value_parser = foolscap::note::parse)]
         note: Option<String>,
     },
     /// Start a clock-in session (time worked is banked on `out`)
     #[command(visible_alias = "start")]
     In {
         /// Attach a note to this session
-        #[arg(long, short = 'm', value_parser = parse_note)]
+        #[arg(long, short = 'm', value_parser = foolscap::note::parse)]
         note: Option<String>,
     },
     /// Start a spending session (time away is deducted on `back`)
     Away {
         /// Attach a note to this session
-        #[arg(long, short = 'm', value_parser = parse_note)]
+        #[arg(long, short = 'm', value_parser = foolscap::note::parse)]
         note: Option<String>,
     },
     /// Close the open session: bank (`in`) or deduct (`away`) the elapsed time
     #[command(alias = "back", visible_alias = "stop")]
     Out {
         /// Attach a note to this log entry
-        #[arg(long, short = 'm', value_parser = parse_note)]
+        #[arg(long, short = 'm', value_parser = foolscap::note::parse)]
         note: Option<String>,
         /// Apply the time even if the session exceeds `max_session`
         #[arg(long)]
@@ -79,13 +69,13 @@ enum Commands {
     /// Record a note without changing your balance
     Note {
         /// The note text
-        #[arg(required = true, value_parser = parse_note)]
+        #[arg(required = true, value_parser = foolscap::note::parse)]
         text: String,
     },
     /// Reset your flexi balance to zero
     Reset {
         /// Attach a note to this log entry
-        #[arg(long, short = 'm', value_parser = parse_note)]
+        #[arg(long, short = 'm', value_parser = foolscap::note::parse)]
         note: Option<String>,
     },
     /// Show balance change history
@@ -191,9 +181,7 @@ fn record_change(cfg: &config::ResolvedConfig, current: i32, new: i32, note: Opt
     let change = new - current;
     let sign = if change >= 0 { "+" } else { "" };
     let mut desc = format!("{}{} > {}", sign, time::format_duration(change), time::format_duration(new));
-    if let Some(n) = note {
-        desc.push_str(&format!(" # {}", n));
-    }
+    foolscap::note::append(&mut desc, note);
     storage::append_log(&cfg.path, &desc, cfg.timestamp_format)?;
     print_change(change, new);
     Ok(())
@@ -259,10 +247,7 @@ fn print_prose(label: &str, added: i32, removed: i32, balance: i32) {
 
 fn print_log_entry(entry: &storage::LogEntry) {
     let ts = entry.timestamp.get(..16).unwrap_or(&entry.timestamp).replace('T', " ");
-    let (body, note) = match entry.description.split_once(" # ") {
-        Some((b, n)) => (b.to_string(), Some(n.to_string())),
-        None => (entry.description.clone(), None),
-    };
+    let (body, note) = foolscap::note::split(&entry.description);
     let body = if let Some(bal) = body.strip_prefix("@in ") {
         format!("clocked in → {}", bal)
     } else if let Some(bal) = body.strip_prefix("@out ") {
@@ -386,7 +371,7 @@ fn run_log(cfg: &config::ResolvedConfig, filter: &LogFilter, summary: bool, pros
             println!("{}", serde_json::to_string_pretty(&obj)?);
         } else {
             let arr: Vec<_> = filtered.iter().map(|e| {
-                let note = e.description.split_once(" # ").map(|(_, n)| n);
+                let note = foolscap::note::split(&e.description).1;
                 serde_json::json!({
                     "timestamp": e.timestamp,
                     "delta_minutes": e.delta_minutes(),
@@ -522,9 +507,7 @@ fn main() -> Result<()> {
             ensure_not_clocked_in(&cfg)?;
             let mins = time::round_to_increment(time::parse_duration(&time.join(" "))?, cfg.increment);
             let mut desc = format!("= {}", time::format_duration(mins));
-            if let Some(n) = note {
-                desc.push_str(&format!(" # {}", n));
-            }
+            foolscap::note::append(&mut desc, note.as_deref());
             storage::append_log(&cfg.path, &desc, cfg.timestamp_format)?;
             print_balance(mins);
         }
@@ -532,9 +515,7 @@ fn main() -> Result<()> {
             ensure_not_clocked_in(&cfg)?;
             let current = storage::read_minutes(&cfg.path)?;
             let mut desc = format!("@in {}", time::format_duration(current));
-            if let Some(n) = note {
-                desc.push_str(&format!(" # {}", n));
-            }
+            foolscap::note::append(&mut desc, note.as_deref());
             storage::append_log(&cfg.path, &desc, cfg.timestamp_format)?;
             println!("clocked in at {}", chrono::Local::now().format("%H:%M"));
         }
@@ -542,9 +523,7 @@ fn main() -> Result<()> {
             ensure_not_clocked_in(&cfg)?;
             let current = storage::read_minutes(&cfg.path)?;
             let mut desc = format!("@out {}", time::format_duration(current));
-            if let Some(n) = note {
-                desc.push_str(&format!(" # {}", n));
-            }
+            foolscap::note::append(&mut desc, note.as_deref());
             storage::append_log(&cfg.path, &desc, cfg.timestamp_format)?;
             println!("stepped away at {}", chrono::Local::now().format("%H:%M"));
         }
@@ -576,7 +555,7 @@ fn main() -> Result<()> {
             let balance = entry.new_minutes()?;
             storage::pop_log(&cfg.path)?;
             let span = format!("{}–{}", start.format("%H:%M"), now.format("%H:%M"));
-            let open_note = entry.description.split_once(" # ").map(|(_, n)| n.to_string());
+            let open_note = foolscap::note::split(&entry.description).1.map(str::to_string);
             // Keep both the session-open note and any closing `-m` note; don't drop either.
             let extra: Vec<String> = [open_note, note].into_iter().flatten().collect();
             let full_note = if extra.is_empty() {
@@ -594,9 +573,7 @@ fn main() -> Result<()> {
         Some(Commands::Reset { note }) => {
             ensure_not_clocked_in(&cfg)?;
             let mut desc = "= 0 min".to_string();
-            if let Some(n) = note {
-                desc.push_str(&format!(" # {}", n));
-            }
+            foolscap::note::append(&mut desc, note.as_deref());
             storage::append_log(&cfg.path, &desc, cfg.timestamp_format)?;
             print_balance(0);
         }
