@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.0] - 2026-10-18
+
 ### Added
 
 - Initial version. A plaintext todo list, one todo per line: `[x ][(A) ][CLOSED ][CREATED ][DUE ]TITLE` — todo.txt's created/closed dates plus a third, positional due date (e.g. `(A) 2026-10-18 2026-10-31 Renew passport`), sorted by status, then priority, then due date, and hand-editable.
