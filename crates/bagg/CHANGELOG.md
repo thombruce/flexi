@@ -7,15 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-### Changed
-
-- A line that already starts with a bare `!` or `~` word now reads it as a status marker rather than part of the name. For example, `~ Gadget` becomes a won't-buy item named `Gadget`. Write `!`/`~` attached to a word to keep it in the name.
+## [0.5.0] - 2026-10-18
 
 ### Added
 
 - Lines may start with `!` (buying this trip) or `~` (decided not to buy) as well as `x`, at most one per line. Items sort `!`, wanted, got, then `~`. `--pending` includes `!` items.
 - `bagg focus <n>` and `bagg wont <n>` toggle an item's "buying this trip" (`!`) or "won't buy" (`~`) status; running one again sets it back to wanted. `list --wont` shows only won't-buy items.
 - `list` tag queries now also match `#hashtag` tags (a `#` followed by a word starting with a letter, e.g. `#urgent`; `#42` isn't one). Quote it on the command line (`list '#urgent'`), or the shell treats it as a comment.
+
+### Changed
+
+- A line that already starts with a bare `!` or `~` word now reads it as a status marker rather than part of the name. For example, `~ Gadget` becomes a won't-buy item named `Gadget`. Write `!`/`~` attached to a word to keep it in the name.
 
 ## [0.4.0] - 2026-10-18
 
