@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.3.0] - 2026-10-18
+
 ### Changed
 
 - **Breaking:** `edit` now runs `$EDITOR` through `sh`, as git does. It may now carry arguments (e.g. `code -w`), but an editor path containing spaces must be quoted inside `$EDITOR`; an unquoted one that used to work now fails. `edit` now needs `sh`, so it no longer works on Windows.
